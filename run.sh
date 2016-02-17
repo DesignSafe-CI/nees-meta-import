@@ -1,2 +1,2 @@
 #!/bin/bash
-sbatch --reservation=NHERI launcher.slurm
+sbatch --reservation=NHERI delete.slurm
