@@ -74,7 +74,7 @@ def insert_project_metadata(root_dir, cursor, project_objects, logging):
 
         # create and insert project metadata
         project_metadata = {}
-        project_metadata['_index'] = 'nees'
+        project_metadata['_index'] = 'test'
         project_metadata['_type'] = 'project'
         project_metadata['name'] = 'object'
         project_metadata['value'] = {}
@@ -140,7 +140,7 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, project_object
 
         # create and insert experiment metadata
         experiment_metadata = {}
-        experiment_metadata['_index'] = 'nees'
+        experiment_metadata['_index'] = 'test'
         experiment_metadata['_type'] = 'experiment'
         experiment_metadata['name'] = 'object'
         experiment_metadata['associationIds'] = project_metadata_uuid
@@ -157,7 +157,7 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, project_object
             logging.debug('insert_experiment_metadata - FAIL - addMetadata:')
             logging.debug(e)
 
-
+# TO-DO: refactor params to objects
 def walk_project_directory(root_dir, project_objects, agave_system, cursor, project_metadata_uuid, logging, project_dir_size):
     # insert project dir/files metadata
     for dir_name, sub_dir_list, file_list in os.walk(root_dir, topdown=False):
@@ -185,7 +185,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 logging.debug(dir_size)
 
                 experiment_dir_metadata = {}
-                experiment_dir_metadata['_index'] = 'nees'
+                experiment_dir_metadata['_index'] = 'test'
                 experiment_dir_metadata['_type'] = 'object'
                 experiment_dir_metadata['name'] = 'object'
                 experiment_dir_metadata['value'] = {}
@@ -215,7 +215,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                     logging.debug(file_size)
 
                     experiment_file_metadata = {}
-                    experiment_file_metadata['_index'] = 'nees'
+                    experiment_file_metadata['_index'] = 'test'
                     experiment_file_metadata['_type'] = 'object'
                     experiment_file_metadata['name'] = 'object'
                     experiment_file_metadata['value'] = {}
@@ -245,7 +245,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 logging.debug(dir_size)
 
                 project_dir_metadata = {}
-                project_dir_metadata['_index'] = 'nees'
+                project_dir_metadata['_index'] = 'test'
                 project_dir_metadata['_type'] = 'object'
                 project_dir_metadata['value'] = {}
                 project_dir_metadata['value']['project'] = root_dir
@@ -282,7 +282,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
 
                     # create project_dir_metadata
                     project_file_metadata = {}
-                    project_file_metadata['_index'] = 'nees'
+                    project_file_metadata['_index'] = 'test'
                     project_file_metadata['_type'] = 'object'
                     project_file_metadata['name'] = 'object'
                     project_file_metadata['associationIds'] = [project_metadata_uuid]
@@ -308,8 +308,8 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
 
 def main(args):
     Config = ConfigParser.ConfigParser()
-    Config.read('/home/02791/mrojas/dsimport/config.properties')
-    # Config.read('config.properties')
+    # Config.read('/home/02791/mrojas/dsimport/config.properties')
+    Config.read('elastic/config.properties')
 
     # nees db auth
     user = Config.get('nees', 'user')

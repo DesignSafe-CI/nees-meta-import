@@ -6,11 +6,11 @@
 #
 # To use, build the launcher executable and your
 # serial application(s) and place them in your WORKDIR
-# directory.  Then, edit the CONTROL_FILE to specify 
+# directory.  Then, edit the CONTROL_FILE to specify
 # each executable per process.
 #-------------------------------------------------------
 #-------------------------------------------------------
-# 
+#
 #------------------Scheduler Options--------------------
 #SBATCH -J NEESImport          # Job name
 #SBATCH -N 1                   # Total number of nodes (16 cores/node)
@@ -27,21 +27,28 @@
 #------------------------------------------------------
 #
 # Usage:
-#	#$ -pe <parallel environment> <number of slots> 
+#	#$ -pe <parallel environment> <number of slots>
 #	#$ -l h_rt=hours:minutes:seconds to specify run time limit
 # 	#$ -N <job name>
 # 	#$ -q <queue name>
 # 	#$ -o <job output file>
-#	   NOTE: The env variable $JOB_ID contains the job id. 
+#	   NOTE: The env variable $JOB_ID contains the job id.
 #
 #------------------------------------------------------
 
 #------------------General Options---------------------
 module load launcher
+module load python
+source virtualenvwrapper.sh
+mkvirtualenv dsimport
+workon dsimport
+pip install git+git://github.com/TACC/agavepy.git
+pip install elasticsearch
+
 export TACC_LAUNCHER_PPN=24
 export EXECUTABLE=$TACC_LAUNCHER_DIR/init_launcher
 export WORKDIR=.
-export CONTROL_FILE=paramlist
+export CONTROL_FILE=agave/test_paramlist
 
 # Variable descriptions:
 #
@@ -78,7 +85,7 @@ export TACC_LAUNCHER_SCHED=interleaved
 # Variable descriptions:
 #  TACC_LAUNCHER_SCHED = scheduling method for lines in CONTROL_FILE
 #                        options (k=process, n=num. lines, p=num. procs):
-#                          - interleaved (default): 
+#                          - interleaved (default):
 #                              process k executes every k+nth line
 #                          - block:
 #                              process k executes lines [ k(n/p)+1 , (k+1)(n/p) ]

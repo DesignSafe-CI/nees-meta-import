@@ -357,8 +357,8 @@ def walk_project_directory(root_dir, agave, agave_system, cursor, project_metada
 
 def main(args):
     Config = ConfigParser.ConfigParser()
-    Config.read('/home/02791/mrojas/dsimport/config.properties')
-    # Config.read('config.properties')
+    # Config.read('/home/02791/mrojas/dsimport/config.properties')
+    Config.read('agave/config.properties')
 
     # nees db auth
     user = Config.get('nees', 'user')
