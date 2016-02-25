@@ -7,6 +7,7 @@ import os
 import sys
 import time
 import urllib
+import hashlib
 
 def convert_rows_to_dict_list(cursor):
     columns = list()
@@ -58,10 +59,7 @@ def insert_project_metadata(root_dir, cursor, project_objects, logging):
         equipment_dict_list = convert_rows_to_dict_list(cursor)
         row_dict['equipment'] = equipment_dict_list
 
-        # add path and change name
-        row_dict['path'] = '/'
-
-        # clean dates & description
+        # clean object
         if row_dict['startDate'] is not None:
             row_dict['startDate'] = row_dict['startDate'].strftime('%Y-%m-%d %H:%M:%S')
 
@@ -71,15 +69,16 @@ def insert_project_metadata(root_dir, cursor, project_objects, logging):
         if 'description4K' in row_dict:
             row_dict['description'] = row_dict['description4K']
             del row_dict['description4K']
+        if 'projid' in row_dict:
+            del row_dict['projid']
 
         # create and insert project metadata
         project_metadata = {}
+        project_metadata = row_dict
         project_metadata['_index'] = 'test'
         project_metadata['_type'] = 'project'
-        project_metadata['name'] = 'object'
-        project_metadata['value'] = {}
-        project_metadata['value'] = row_dict
-        project_metadata['value']['deleted'] = "false"
+        project_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
+        project_metadata['deleted'] = "false"
 
         try:
             logging.debug('insert_project_metadata - project_metadata.append')
@@ -124,8 +123,8 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, project_object
 
         # facility
         cursor.execute("select a.name, c.name, c.state, c.country from experiment a join experiment_organization b on a.expid = b.expid join organization c on b.orgid = c.orgid where a.projid = " + "\'" + str(row_dict['projid']) + "\'" + " and a.name = " + "\'" + str(experiment_name) + "\'" )
-        organization_dict_list = convert_rows_to_dict_list(cursor)
-        row_dict['organization'] = organization_dict_list
+        facility_dict_list = convert_rows_to_dict_list(cursor)
+        row_dict['facility'] = facility_dict_list
 
         # clean dates & description
         if row_dict['startDate'] is not None:
@@ -137,16 +136,16 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, project_object
         if 'description4K' in row_dict:
             row_dict['description'] = row_dict['description4K']
             del row_dict['description4K']
+        del row_dict['projid']
 
         # create and insert experiment metadata
         experiment_metadata = {}
+        experiment_metadata = row_dict
         experiment_metadata['_index'] = 'test'
         experiment_metadata['_type'] = 'experiment'
-        experiment_metadata['name'] = 'object'
-        experiment_metadata['associationIds'] = project_metadata_uuid
-        experiment_metadata['value'] = {}
-        experiment_metadata['value'] = row_dict
-        experiment_metadata['value']['deleted'] = "false"
+        experiment_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
+        experiment_metadata['project'] = project_metadata_uuid.split('.')[0]
+        experiment_metadata['deleted'] = "false"
 
         try:
             logging.debug('insert_experiment_metadata - before project_objects.append')
@@ -184,21 +183,23 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 logging.debug('walk_project_directory - dir_size:')
                 logging.debug(dir_size)
 
+                agave_path = 'agave://' + agave_system + '/' + rel_path + '/' + dir_name.split(os.path.sep)[-1]
+                logging.debug('\twalk_project_directory experiment_dir_metadata agave_path:')
+                logging.debug(agave_path)
+
                 experiment_dir_metadata = {}
                 experiment_dir_metadata['_index'] = 'test'
                 experiment_dir_metadata['_type'] = 'object'
-                experiment_dir_metadata['name'] = 'object'
-                experiment_dir_metadata['value'] = {}
-                experiment_dir_metadata['value']['project'] = root_dir
-                experiment_dir_metadata['value']['format'] = 'folder'
-                experiment_dir_metadata['value']['length'] = dir_size
-                experiment_dir_metadata['value']['path'] = rel_path
-                experiment_dir_metadata['value']['name'] = dir_name.split(os.path.sep)[-1]
-                experiment_dir_metadata['value']['permissions'] = 'READ'
-                experiment_dir_metadata['value']['systemId'] = agave_system
-                experiment_dir_metadata['value']['type'] = 'dir'
-                experiment_dir_metadata['value']['legacy'] = 'true'
-                experiment_dir_metadata['value']['deleted'] = 'false'
+                experiment_dir_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
+                experiment_dir_metadata['project'] = root_dir
+                experiment_dir_metadata['format'] = 'folder'
+                experiment_dir_metadata['length'] = dir_size
+                experiment_dir_metadata['path'] = rel_path
+                experiment_dir_metadata['name'] = dir_name.split(os.path.sep)[-1]
+                experiment_dir_metadata['systemId'] = agave_system
+                experiment_dir_metadata['type'] = 'dir'
+                experiment_dir_metadata['deleted'] = 'false'
+                experiment_dir_metadata['agavePath'] = agave_path
 
                 logging.debug('walk_project_directory - before meta.addMetadata')
                 project_objects.append(experiment_dir_metadata)
@@ -214,21 +215,22 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                     logging.debug('\twalk_project_directory - file size:')
                     logging.debug(file_size)
 
+                    agave_path = 'agave://' + agave_system + '/' + dir_name + '/' + fname
+                    logging.debug('\twalk_project_directory - experiment_file_metadata agave_path:')
+                    logging.debug(agave_path)
+
                     experiment_file_metadata = {}
                     experiment_file_metadata['_index'] = 'test'
                     experiment_file_metadata['_type'] = 'object'
-                    experiment_file_metadata['name'] = 'object'
-                    experiment_file_metadata['value'] = {}
-                    experiment_file_metadata['value']['project'] = root_dir
-                    experiment_file_metadata['value']['format'] = 'raw'
-                    experiment_file_metadata['value']['length'] = file_size
-                    experiment_file_metadata['value']['path'] = dir_name
-                    experiment_file_metadata['value']['name'] = fname
-                    experiment_file_metadata['value']['permissions'] = 'READ'
-                    experiment_file_metadata['value']['systemId'] = agave_system
-                    experiment_file_metadata['value']['type'] = 'file'
-                    experiment_file_metadata['value']['legacy'] = 'true'
-                    experiment_file_metadata['value']['deleted'] = 'false'
+                    experiment_file_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
+                    experiment_file_metadata['project'] = root_dir
+                    experiment_file_metadata['format'] = 'raw'
+                    experiment_file_metadata['length'] = file_size
+                    experiment_file_metadata['path'] = dir_name
+                    experiment_file_metadata['name'] = fname
+                    experiment_file_metadata['systemId'] = agave_system
+                    experiment_file_metadata['type'] = 'file'
+                    experiment_file_metadata['deleted'] = 'false'
 
                     logging.debug('\twalk_project_directory - before project_objects.append')
                     project_objects.append(experiment_file_metadata)
@@ -247,23 +249,27 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 project_dir_metadata = {}
                 project_dir_metadata['_index'] = 'test'
                 project_dir_metadata['_type'] = 'object'
-                project_dir_metadata['value'] = {}
-                project_dir_metadata['value']['project'] = root_dir
-                project_dir_metadata['value']['format'] = 'folder'
+                project_dir_metadata['project'] = root_dir
+                project_dir_metadata['format'] = 'folder'
 
                 # If creating NEES-####-####.groups dir, rel path from projects/ to /
                 if '.groups' in dir_name.split(os.path.sep)[-1]:
-                    project_dir_metadata['value']['path'] = '/'
+                    project_dir_metadata['path'] = '/'
+                    agave_path = 'agave://' + agave_system + '/' + dir_name.split(os.path.sep)[-1]
+                    logging.debug('walk_project_directory - project_dir_metadata agave_path:')
+                    logging.debug(agave_path)
                 else:
-                    project_dir_metadata['value']['path'] = rel_path
+                    project_dir_metadata['path'] = rel_path
+                    agave_path = 'agave://' + agave_system + '/' + project_dir_metadata['path'] + '/' + dir_name.split(os.path.sep)[-1]
+                    logging.debug('walk_project_directory - project_dir_metadata agave_path:')
+                    logging.debug(agave_path)
 
-                project_dir_metadata['value']['length'] = dir_size
-                project_dir_metadata['value']['name'] = dir_name.split(os.path.sep)[-1]
-                project_dir_metadata['value']['permissions'] = 'READ'
-                project_dir_metadata['value']['systemId'] = agave_system
-                project_dir_metadata['value']['type'] = 'dir'
-                project_dir_metadata['value']['legacy'] = 'true'
-                project_dir_metadata['value']['deleted'] = 'false'
+                project_dir_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
+                project_dir_metadata['length'] = dir_size
+                project_dir_metadata['name'] = dir_name.split(os.path.sep)[-1]
+                project_dir_metadata['systemId'] = agave_system
+                project_dir_metadata['type'] = 'dir'
+                project_dir_metadata['deleted'] = 'false'
 
                 logging.debug('walk_project_directory - before meta.addMetadata:')
                 project_objects.append(project_dir_metadata)
@@ -280,23 +286,23 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                     logging.debug('\twalk_project_directory - file size:')
                     logging.debug(file_size)
 
+                    agave_path = 'agave://' + agave_system + '/' + dir_name + '/' + fname
+                    logging.debug('\twalk_project_directory - project_file_metadata agave_path:')
+                    logging.debug(agave_path)
+
                     # create project_dir_metadata
                     project_file_metadata = {}
                     project_file_metadata['_index'] = 'test'
                     project_file_metadata['_type'] = 'object'
-                    project_file_metadata['name'] = 'object'
-                    project_file_metadata['associationIds'] = [project_metadata_uuid]
-                    project_file_metadata['value'] = {}
-                    project_file_metadata['value']['project'] = root_dir
-                    project_file_metadata['value']['format'] = 'raw'
-                    project_file_metadata['value']['length'] = file_size
-                    project_file_metadata['value']['path'] = dir_name
-                    project_file_metadata['value']['name'] = fname
-                    project_file_metadata['value']['permissions'] = 'READ'
-                    project_file_metadata['value']['systemId'] = agave_system
-                    project_file_metadata['value']['type'] = 'file'
-                    project_file_metadata['value']['legacy'] = 'true'
-                    project_file_metadata['value']['deleted'] = 'false'
+                    project_file_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
+                    project_file_metadata['project'] = root_dir.split('.')[0]
+                    project_file_metadata['format'] = 'raw'
+                    project_file_metadata['length'] = file_size
+                    project_file_metadata['path'] = dir_name
+                    project_file_metadata['name'] = fname
+                    project_file_metadata['systemId'] = agave_system
+                    project_file_metadata['type'] = 'file'
+                    project_file_metadata['deleted'] = 'false'
 
                     logging.debug('\twalk_project_directory - before meta.addMetadata')
                     project_objects.append(project_file_metadata)
@@ -308,11 +314,10 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
 
 def main(args):
     Config = ConfigParser.ConfigParser()
-    # Config.read('/home/02791/mrojas/dsimport/config.properties')
-    Config.read('elastic/config.properties')
+    Config.read(os.path.realpath(__file__).rsplit(os.path.sep, 1)[0] + '/config.properties')
 
     # nees db auth
-    user = Config.get('nees', 'user')
+    user=Config.get('nees', 'user')
     pswd=Config.get('nees', 'pswd')
     host=Config.get('nees', 'host')
     port=Config.get('nees', 'port')
@@ -326,7 +331,13 @@ def main(args):
 
     root_dir = args[0]
 
-    log_file = Config.get('log', 'dir') + root_dir + '.log'
+    log_file = os.path.realpath(__file__).rsplit(os.path.sep, 1)[0] + '/logs/' + root_dir + '.log'
+
+    es_tracer = logging.getLogger('elasticsearch.trace')
+    es_tracer.setLevel(logging.INFO)
+    es_tracer.addHandler(logging.FileHandler(os.path.realpath(__file__).rsplit(os.path.sep, 1)[0] + '/logs/' + root_dir + '_es.log'))
+
+
     FORMAT = "%(asctime)s.%(msecs)d %(message)s"
     logging.basicConfig(format=FORMAT, filename=log_file,level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S')
     logging.basicConfig(filename=log_file,level=logging.DEBUG)
@@ -343,7 +354,6 @@ def main(args):
         project_objects_tuple = tuple(project_objects)
         es = Elasticsearch([Config.get('es', 'es_server')])
         project_objects_inserted = helpers.bulk(es, project_objects_tuple)
-        print project_objects_inserted
 
 
 if len(sys.argv) < 2:

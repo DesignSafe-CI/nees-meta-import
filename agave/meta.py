@@ -357,8 +357,7 @@ def walk_project_directory(root_dir, agave, agave_system, cursor, project_metada
 
 def main(args):
     Config = ConfigParser.ConfigParser()
-    # Config.read('/home/02791/mrojas/dsimport/config.properties')
-    Config.read('agave/config.properties')
+    Config.read(os.path.realpath(__file__).rsplit(os.path.sep, 1)[0] + '/config.properties')
 
     # nees db auth
     user = Config.get('nees', 'user')
@@ -383,7 +382,7 @@ def main(args):
     root_dir = args[0]
 
 
-    log_file = Config.get('log', 'dir') + root_dir + '.log'
+    log_file = os.path.realpath(__file__).rsplit(os.path.sep, 1)[0] + '/logs/' + root_dir + '.log'
     FORMAT = "%(asctime)s.%(msecs)d %(message)s"
     logging.basicConfig(format=FORMAT, filename=log_file,level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S')
     logging.basicConfig(filename=log_file,level=logging.DEBUG)
