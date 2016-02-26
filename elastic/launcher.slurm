@@ -50,7 +50,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ORACLE_HOME
 export TACC_LAUNCHER_PPN=24
 export EXECUTABLE=$TACC_LAUNCHER_DIR/init_launcher
 export WORKDIR=/corral-repl/tacc/NHERI/public/projects
-export CONTROL_FILE=/work/02791/mrojas/wrangler/nees-meta-import/elastic/insert_paramlist2
+export CONTROL_FILE=/work/02791/mrojas/wrangler/nees-meta-import/elastic/insert_paramlist
 
 # Variable descriptions:
 #
