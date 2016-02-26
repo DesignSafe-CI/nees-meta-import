@@ -26,7 +26,7 @@ def get_dir_size(path):
     return sum( os.path.getsize(os.path.join(dirpath,filename)) for dirpath, dirnames, filenames in os.walk( path ) for filename in filenames )
 
 
-def insert_project_metadata(root_dir, cursor, project_objects, logging):
+def insert_project_metadata(root_dir, cursor, project_objects, logging, _index):
     logging.debug('insert_project_metadata')
 
     # get project name
@@ -75,7 +75,7 @@ def insert_project_metadata(root_dir, cursor, project_objects, logging):
         # create and insert project metadata
         project_metadata = {}
         project_metadata = row_dict
-        project_metadata['_index'] = 'test'
+        project_metadata['_index'] = _index
         project_metadata['_type'] = 'project'
         project_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
         project_metadata['deleted'] = "false"
@@ -89,10 +89,10 @@ def insert_project_metadata(root_dir, cursor, project_objects, logging):
             logging.debug('insert_project_metadata - FAIL - project_metadata.append:')
             logging.debug(e)
 
-def insert_experiment_metadata(root_dir, experiment_name, cursor, project_objects, project_metadata_uuid):
+def insert_experiment_metadata(root_dir, experiment_name, cursor, project_objects, project_metadata_id, _index):
     logging.debug('insert_experiment_metadata')
-    logging.debug('project_metadata_uuid:')
-    logging.debug(project_metadata_uuid)
+    logging.debug('project_metadata_id:')
+    logging.debug(project_metadata_id)
 
     # get project name
     project_name = os.path.basename(os.path.normpath(root_dir))
@@ -141,10 +141,10 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, project_object
         # create and insert experiment metadata
         experiment_metadata = {}
         experiment_metadata = row_dict
-        experiment_metadata['_index'] = 'test'
+        experiment_metadata['_index'] = _index
         experiment_metadata['_type'] = 'experiment'
         experiment_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
-        experiment_metadata['project'] = project_metadata_uuid.split('.')[0]
+        experiment_metadata['project'] = project_metadata_id.split('.')[0]
         experiment_metadata['deleted'] = "false"
 
         try:
@@ -157,7 +157,7 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, project_object
             logging.debug(e)
 
 # TO-DO: refactor params to objects
-def walk_project_directory(root_dir, project_objects, agave_system, cursor, project_metadata_uuid, logging, project_dir_size):
+def walk_project_directory(root_dir, project_objects, agave_system, cursor, project_metadata_id, logging, project_dir_size, _index):
     # insert project dir/files metadata
     for dir_name, sub_dir_list, file_list in os.walk(root_dir, topdown=False):
         logging.debug('walk_project_directory - Found directory: ' + dir_name)
@@ -174,7 +174,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 # if Experiment-* insert one time only experiment db metadata
                 experiment_metadata_uuid = ''
                 if 'Experiment-' in dir_name.split(os.path.sep)[-1]:
-                    experiment_metadata_uuid = insert_experiment_metadata(root_dir, dir_name.split(os.path.sep)[-1], cursor, project_objects, project_metadata_uuid)
+                    experiment_metadata_uuid = insert_experiment_metadata(root_dir, dir_name.split(os.path.sep)[-1], cursor, project_objects, project_metadata_id, _index)
                     logging.debug('walk_project_directory - experiment_metadata_uuid:')
                     logging.debug(experiment_metadata_uuid)
 
@@ -188,7 +188,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 logging.debug(agave_path)
 
                 experiment_dir_metadata = {}
-                experiment_dir_metadata['_index'] = 'test'
+                experiment_dir_metadata['_index'] = 'nees'
                 experiment_dir_metadata['_type'] = 'object'
                 experiment_dir_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
                 experiment_dir_metadata['project'] = root_dir
@@ -220,7 +220,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                     logging.debug(agave_path)
 
                     experiment_file_metadata = {}
-                    experiment_file_metadata['_index'] = 'test'
+                    experiment_file_metadata['_index'] = 'nees'
                     experiment_file_metadata['_type'] = 'object'
                     experiment_file_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
                     experiment_file_metadata['project'] = root_dir
@@ -247,7 +247,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 logging.debug(dir_size)
 
                 project_dir_metadata = {}
-                project_dir_metadata['_index'] = 'test'
+                project_dir_metadata['_index'] = 'nees'
                 project_dir_metadata['_type'] = 'object'
                 project_dir_metadata['project'] = root_dir
                 project_dir_metadata['format'] = 'folder'
@@ -292,7 +292,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
 
                     # create project_dir_metadata
                     project_file_metadata = {}
-                    project_file_metadata['_index'] = 'test'
+                    project_file_metadata['_index'] = 'nees'
                     project_file_metadata['_type'] = 'object'
                     project_file_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
                     project_file_metadata['project'] = root_dir.split('.')[0]
@@ -342,15 +342,17 @@ def main(args):
     logging.basicConfig(format=FORMAT, filename=log_file,level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S')
     logging.basicConfig(filename=log_file,level=logging.DEBUG)
 
-    project_objects = []
-    project_metadata_uuid = insert_project_metadata(root_dir, cursor, project_objects, logging)
+    _index = Config.get('es', '_index')
 
-    if not project_metadata_uuid:
+    project_objects = []
+    project_metadata_id = insert_project_metadata(root_dir, cursor, project_objects, logging, _index)
+
+    if not project_metadata_id:
         logging.debug('main - could not insert project metadata, skipping this project')
     else:
         logging.debug('main - inserting project: ' + root_dir)
         project_dir_size = 0
-        walk_project_directory(root_dir, project_objects, agave_system, cursor, project_metadata_uuid, logging, project_dir_size)
+        walk_project_directory(root_dir, project_objects, agave_system, cursor, project_metadata_id, logging, project_dir_size, _index)
         project_objects_tuple = tuple(project_objects)
         es = Elasticsearch([Config.get('es', 'es_server')])
         project_objects_inserted = helpers.bulk(es, project_objects_tuple)
