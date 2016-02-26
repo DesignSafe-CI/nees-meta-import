@@ -231,6 +231,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                     experiment_file_metadata['systemId'] = agave_system
                     experiment_file_metadata['type'] = 'file'
                     experiment_file_metadata['deleted'] = 'false'
+                    experiment_file_metadata['agavePath'] = agave_path
 
                     logging.debug('\twalk_project_directory - before project_objects.append')
                     project_objects.append(experiment_file_metadata)
@@ -270,6 +271,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 project_dir_metadata['systemId'] = agave_system
                 project_dir_metadata['type'] = 'dir'
                 project_dir_metadata['deleted'] = 'false'
+                project_dir_metadata['agavePath'] = agave_path
 
                 logging.debug('walk_project_directory - before meta.addMetadata:')
                 project_objects.append(project_dir_metadata)
@@ -303,6 +305,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                     project_file_metadata['systemId'] = agave_system
                     project_file_metadata['type'] = 'file'
                     project_file_metadata['deleted'] = 'false'
+                    project_file_metadata['agavePath'] = agave_path
 
                     logging.debug('\twalk_project_directory - before meta.addMetadata')
                     project_objects.append(project_file_metadata)
