@@ -353,9 +353,10 @@ def main(args):
     if not project_metadata_id:
         logging.debug('main - could not insert project metadata, skipping this project')
     else:
-        logging.debug('main - inserting project: ' + root_dir)
+        logging.debug('main - before inserting project: ' + root_dir)
         project_dir_size = 0
         walk_project_directory(root_dir, project_objects, agave_system, cursor, project_metadata_id, logging, project_dir_size, _index)
+        logging.debug('main - after inserting project: ' + root_dir)
         project_objects_tuple = tuple(project_objects)
         es = Elasticsearch([Config.get('es', 'es_server')])
         project_objects_inserted = helpers.bulk(es, project_objects_tuple)

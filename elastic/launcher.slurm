@@ -20,7 +20,7 @@
 #SBATCH -e neesimport.e%j
 #SBATCH -t 24:00:00            # Run time (hh:mm:ss)
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=mock@tacc.utexas.edu,mrojas@tacc.utexas.edu
+#SBATCH --mail-user=mrojas@tacc.utexas.edu
 #      <------------ Account String ------------>
 # <--- (Use this ONLY if you have MULTIPLE accounts) --->
 #SBATCH -A TACC-ACI
@@ -44,11 +44,13 @@ mkvirtualenv dsimport
 workon dsimport
 pip install git+git://github.com/TACC/agavepy.git
 pip install elasticsearch
+export ORACLE_HOME=$HOME/oracle/instantclient_12_1/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ORACLE_HOME
 
 export TACC_LAUNCHER_PPN=24
 export EXECUTABLE=$TACC_LAUNCHER_DIR/init_launcher
-export WORKDIR=.
-export CONTROL_FILE=elastic/insert_paramlist
+export WORKDIR=/corral-repl/tacc/NHERI/public/projects
+export CONTROL_FILE=/work/02791/mrojas/wrangler/nees-meta-import/elastic/insert_paramlist2
 
 # Variable descriptions:
 #
@@ -114,7 +116,10 @@ if [ ! -x $EXECUTABLE ]; then
 	exit
 fi
 
-if [ ! -e $WORKDIR/$CONTROL_FILE ]; then
+echo $WORKDIR/$CONTROL_FILE
+
+#if [ ! -e $WORKDIR/$CONTROL_FILE ]; then
+if [ ! -e $CONTROL_FILE ]; then
 	echo " "
 	echo "Error: unable to find input control file $CONTROL_FILE."
 	echo " "
@@ -127,7 +132,6 @@ fi
 #----------------
 
 cd $WORKDIR/
-echo " WORKING DIR:   $WORKDIR/"
 
 $TACC_LAUNCHER_DIR/paramrun SLURM $EXECUTABLE $WORKDIR $CONTROL_FILE $PHI_WORKDIR $PHI_CONTROL_FILE
 
