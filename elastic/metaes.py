@@ -139,11 +139,13 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, project_object
         del row_dict['projid']
 
         # create and insert experiment metadata
+        # es_id = hashlib.md5(NEES-####-####-Experiment-#)
+        es_id = project_metadata_id.split('.')[0] + '-' + row_dict['name']
         experiment_metadata = {}
         experiment_metadata = row_dict
         experiment_metadata['_index'] = _index
         experiment_metadata['_type'] = 'experiment'
-        experiment_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
+        experiment_metadata['_id'] = hashlib.md5(es_id).hexdigest()
         experiment_metadata['project'] = project_metadata_id.split('.')[0]
         experiment_metadata['deleted'] = "false"
 
