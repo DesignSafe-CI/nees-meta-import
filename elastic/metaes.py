@@ -26,7 +26,7 @@ def get_dir_size(path):
     return sum( os.path.getsize(os.path.join(dirpath,filename)) for dirpath, dirnames, filenames in os.walk( path ) for filename in filenames )
 
 
-def insert_project_metadata(root_dir, cursor, project_objects, logging, _index):
+def insert_project_metadata(root_dir, agave_system, cursor, project_objects, logging, _index):
     logging.debug('insert_project_metadata')
 
     # get project name
@@ -78,7 +78,9 @@ def insert_project_metadata(root_dir, cursor, project_objects, logging, _index):
         project_metadata['_index'] = _index
         project_metadata['_type'] = 'project'
         project_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
-        project_metadata['deleted'] = "false"
+        project_metadata['deleted'] = 'false'
+        project_metadata['systemId'] = agave_system
+        project_metadata['path'] = os.path.basename(os.path.normpath(root_dir))
 
         try:
             logging.debug('insert_project_metadata - project_metadata.append')
@@ -89,7 +91,7 @@ def insert_project_metadata(root_dir, cursor, project_objects, logging, _index):
             logging.debug('insert_project_metadata - FAIL - project_metadata.append:')
             logging.debug(e)
 
-def insert_experiment_metadata(root_dir, experiment_name, cursor, project_objects, project_metadata_id, _index):
+def insert_experiment_metadata(root_dir, agave_system, experiment_name, cursor, project_objects, project_metadata_id, _index):
     logging.debug('insert_experiment_metadata')
     logging.debug('project_metadata_id:')
     logging.debug(project_metadata_id)
@@ -139,15 +141,17 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, project_object
         del row_dict['projid']
 
         # create and insert experiment metadata
-        # es_id = hashlib.md5(NEES-####-####-Experiment-#)
-        es_id = project_metadata_id.split('.')[0] + '-' + row_dict['name']
+        # experiment_dir_path = hashlib.md5(NEES-####-####.groups/Experiment-#)
+        experiment_dir_path = os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
         experiment_metadata = {}
         experiment_metadata = row_dict
         experiment_metadata['_index'] = _index
         experiment_metadata['_type'] = 'experiment'
-        experiment_metadata['_id'] = hashlib.md5(es_id).hexdigest()
+        experiment_metadata['_id'] = hashlib.md5(experiment_dir_path).hexdigest()
         experiment_metadata['project'] = project_metadata_id.split('.')[0]
-        experiment_metadata['deleted'] = "false"
+        experiment_metadata['deleted'] = 'false'
+        experiment_metadata['systemId'] = agave_system
+        experiment_metadata['path'] = experiment_dir_path
 
         try:
             logging.debug('insert_experiment_metadata - before project_objects.append')
@@ -176,7 +180,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 # if Experiment-* insert one time only experiment db metadata
                 experiment_metadata_uuid = ''
                 if 'Experiment-' in dir_name.split(os.path.sep)[-1]:
-                    experiment_metadata_uuid = insert_experiment_metadata(root_dir, dir_name.split(os.path.sep)[-1], cursor, project_objects, project_metadata_id, _index)
+                    experiment_metadata_uuid = insert_experiment_metadata(root_dir, agave_system, dir_name.split(os.path.sep)[-1], cursor, project_objects, project_metadata_id, _index)
                     logging.debug('walk_project_directory - experiment_metadata_uuid:')
                     logging.debug(experiment_metadata_uuid)
 
@@ -350,7 +354,7 @@ def main(args):
     _index = Config.get('es', '_index')
 
     project_objects = []
-    project_metadata_id = insert_project_metadata(root_dir, cursor, project_objects, logging, _index)
+    project_metadata_id = insert_project_metadata(root_dir, agave_system, cursor, project_objects, logging, _index)
 
     if not project_metadata_id:
         logging.debug('main - could not insert project metadata, skipping this project')
