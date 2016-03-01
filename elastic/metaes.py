@@ -55,7 +55,7 @@ def insert_project_metadata(root_dir, agave_system, cursor, project_objects, log
         row_dict['organization'] = organization_dict_list
 
         # equipment
-        cursor.execute("select c.name as component, e.class_name as equipment_class, f.name as facility from experiment a join experiment_equipment b on a.expid = b.experiment_id join equipment c on b.equipment_id = c.equipment_id join equipment_model d on c.model_id = d.id join equipment_class e on d.equipment_class_id = e.equipment_class_id join organization f on c.orgid = f.orgid where a.projid = " + "\'" + str(project_id) + "\'")
+        cursor.execute("select distinct c.name as component, e.class_name as equipment_class, f.name as facility from experiment a join experiment_equipment b on a.expid = b.experiment_id join equipment c on b.equipment_id = c.equipment_id join equipment_model d on c.model_id = d.id join equipment_class e on d.equipment_class_id = e.equipment_class_id join organization f on c.orgid = f.orgid where a.projid = " + "\'" + str(project_id) + "\'")
         equipment_dict_list = convert_rows_to_dict_list(cursor)
         row_dict['equipment'] = equipment_dict_list
 
@@ -80,7 +80,7 @@ def insert_project_metadata(root_dir, agave_system, cursor, project_objects, log
         project_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
         project_metadata['deleted'] = 'false'
         project_metadata['systemId'] = agave_system
-        project_metadata['path'] = os.path.basename(os.path.normpath(root_dir))
+        project_metadata['projectPath'] = os.path.basename(os.path.normpath(root_dir))
 
         try:
             logging.debug('insert_project_metadata - project_metadata.append')
@@ -98,8 +98,6 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, cursor, 
 
     # get project name
     project_name = os.path.basename(os.path.normpath(root_dir))
-
-    # parse name and get id
     project_name = project_name.split('.')[0]
 
     logging.debug('insert_experiment_metadata - project_name:')
@@ -138,7 +136,8 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, cursor, 
         if 'description4K' in row_dict:
             row_dict['description'] = row_dict['description4K']
             del row_dict['description4K']
-        del row_dict['projid']
+        if 'projid' in row_dict:
+            del row_dict['projid']
 
         # create and insert experiment metadata
         # experiment_dir_path = hashlib.md5(NEES-####-####.groups/Experiment-#)
@@ -151,7 +150,7 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, cursor, 
         experiment_metadata['project'] = project_metadata_id.split('.')[0]
         experiment_metadata['deleted'] = 'false'
         experiment_metadata['systemId'] = agave_system
-        experiment_metadata['path'] = experiment_dir_path
+        experiment_metadata['experimentPath'] = experiment_dir_path
 
         try:
             logging.debug('insert_experiment_metadata - before project_objects.append')
@@ -194,7 +193,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 logging.debug(agave_path)
 
                 experiment_dir_metadata = {}
-                experiment_dir_metadata['_index'] = 'nees'
+                experiment_dir_metadata['_index'] = _index
                 experiment_dir_metadata['_type'] = 'object'
                 experiment_dir_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
                 experiment_dir_metadata['project'] = root_dir
@@ -226,7 +225,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                     logging.debug(agave_path)
 
                     experiment_file_metadata = {}
-                    experiment_file_metadata['_index'] = 'nees'
+                    experiment_file_metadata['_index'] = _index
                     experiment_file_metadata['_type'] = 'object'
                     experiment_file_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
                     experiment_file_metadata['project'] = root_dir
@@ -254,7 +253,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
                 logging.debug(dir_size)
 
                 project_dir_metadata = {}
-                project_dir_metadata['_index'] = 'nees'
+                project_dir_metadata['_index'] = _index
                 project_dir_metadata['_type'] = 'object'
                 project_dir_metadata['project'] = root_dir
                 project_dir_metadata['format'] = 'folder'
@@ -300,7 +299,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, cursor, proj
 
                     # create project_dir_metadata
                     project_file_metadata = {}
-                    project_file_metadata['_index'] = 'nees'
+                    project_file_metadata['_index'] = _index
                     project_file_metadata['_type'] = 'object'
                     project_file_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
                     project_file_metadata['project'] = root_dir.split('.')[0]

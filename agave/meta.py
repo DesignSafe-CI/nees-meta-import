@@ -42,13 +42,11 @@ def set_metadata_public_permissions(agave, metadata_uuid, username, permission):
         logging.debug(e)
 
 
-def insert_project_metadata(root_dir, cursor, agave, logging):
+def insert_project_metadata(root_dir, agave_system, cursor, agave, logging):
     logging.debug('insert_project_metadata')
 
     # get project name
     project_name = os.path.basename(os.path.normpath(root_dir))
-
-    # find project id
     project_name = project_name.split('.')[0]
 
     logging.debug('insert_project_metadata - project_name: ' + project_name)
@@ -71,7 +69,7 @@ def insert_project_metadata(root_dir, cursor, agave, logging):
         row_dict['organization'] = organization_dict_list
 
         # equipment
-        cursor.execute("select c.name as component, e.class_name as equipment_class, f.name as facility from experiment a join experiment_equipment b on a.expid = b.experiment_id join equipment c on b.equipment_id = c.equipment_id join equipment_model d on c.model_id = d.id join equipment_class e on d.equipment_class_id = e.equipment_class_id join organization f on c.orgid = f.orgid where a.projid = " + "\'" + str(project_id) + "\'")
+        cursor.execute("select distinct c.name as component, e.class_name as equipment_class, f.name as facility from experiment a join experiment_equipment b on a.expid = b.experiment_id join equipment c on b.equipment_id = c.equipment_id join equipment_model d on c.model_id = d.id join equipment_class e on d.equipment_class_id = e.equipment_class_id join organization f on c.orgid = f.orgid where a.projid = " + "\'" + str(project_id) + "\'")
         equipment_dict_list = convert_rows_to_dict_list(cursor)
         row_dict['equipment'] = equipment_dict_list
 
@@ -88,13 +86,17 @@ def insert_project_metadata(root_dir, cursor, agave, logging):
         if 'description4K' in row_dict:
             row_dict['description'] = row_dict['description4K']
             del row_dict['description4K']
+        if 'projid' in row_dict:
+            del row_dict['projid']
 
         # create and insert project metadata
         project_metadata = {}
         project_metadata['name'] = 'object'
         project_metadata['value'] = {}
         project_metadata['value'] = row_dict
-        project_metadata['value']['deleted'] = "false"
+        project_metadata['value']['deleted'] = 'false'
+        project_metadata['value']['systemId'] = agave_system
+        project_metadata['value']['projectPath'] = os.path.basename(os.path.normpath(root_dir))
         project_metadata_json = json.dumps(project_metadata)
         logging.debug('insert_project_metadata - project_metadata_json: ')
         logging.debug(project_metadata_json)
@@ -113,7 +115,7 @@ def insert_project_metadata(root_dir, cursor, agave, logging):
             logging.debug(e)
 
 
-def insert_experiment_metadata(root_dir, experiment_name, cursor, agave, project_metadata_uuid):
+def insert_experiment_metadata(root_dir, agave_system, experiment_name, cursor, agave, project_metadata_uuid):
     logging.debug('insert_experiment_metadata')
     logging.debug('project_metadata_uuid:')
     logging.debug(project_metadata_uuid)
@@ -147,8 +149,8 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, agave, project
 
         # facility
         cursor.execute("select a.name, c.name, c.state, c.country from experiment a join experiment_organization b on a.expid = b.expid join organization c on b.orgid = c.orgid where a.projid = " + "\'" + str(row_dict['projid']) + "\'" + " and a.name = " + "\'" + str(experiment_name) + "\'" )
-        organization_dict_list = convert_rows_to_dict_list(cursor)
-        row_dict['organization'] = organization_dict_list
+        facility_dict_list = convert_rows_to_dict_list(cursor)
+        row_dict['facility'] = facility_dict_list
 
         # clean dates & description
         if row_dict['startDate'] is not None:
@@ -160,14 +162,20 @@ def insert_experiment_metadata(root_dir, experiment_name, cursor, agave, project
         if 'description4K' in row_dict:
             row_dict['description'] = row_dict['description4K']
             del row_dict['description4K']
+        if 'projid' in row_dict:
+            del row_dict['projid']
 
         # create and insert experiment metadata
+        # experiment_dir_path = hashlib.md5(NEES-####-####.groups/Experiment-#)
+        experiment_dir_path = os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
         experiment_metadata = {}
         experiment_metadata['name'] = 'object'
         experiment_metadata['associationIds'] = project_metadata_uuid
         experiment_metadata['value'] = {}
         experiment_metadata['value'] = row_dict
-        experiment_metadata['value']['deleted'] = "false"
+        experiment_metadata['value']['deleted'] = 'false'
+        experiment_metadata['value']['systemId'] = agave_system
+        experiment_metadata['value']['experimentPath'] = experiment_dir_path
         experiment_metadata_json = json.dumps(experiment_metadata)
 
         logging.debug('insert_experiment_metadata - experiment_metadata_json:')
@@ -205,9 +213,41 @@ def walk_project_directory(root_dir, agave, agave_system, cursor, project_metada
                 # if Experiment-* insert one time only experiment db metadata
                 experiment_metadata_uuid = ''
                 if 'Experiment-' in dir_name.split(os.path.sep)[-1]:
-                    experiment_metadata_uuid = insert_experiment_metadata(root_dir, dir_name.split(os.path.sep)[-1], cursor, agave, project_metadata_uuid)
+                    experiment_metadata_uuid = insert_experiment_metadata(root_dir, agave_system, dir_name.split(os.path.sep)[-1], cursor, agave, project_metadata_uuid)
                     logging.debug('walk_project_directory - experiment_metadata_uuid:')
                     logging.debug(experiment_metadata_uuid)
+
+                ########################## insert exp dir ##################
+                dir_size = get_dir_size(dir_name)
+                logging.debug('walk_project_directory - dir_size:')
+                logging.debug(dir_size)
+
+                experiment_dir_metadata = {}
+                # experiment_dir_metadata['name'] = dir_name
+                experiment_dir_metadata['name'] = 'object'
+                experiment_dir_metadata['associationIds'] = [experiment_metadata_uuid]
+                experiment_dir_metadata['value'] = {}
+                experiment_dir_metadata['value']['format'] = 'folder'
+                experiment_dir_metadata['value']['length'] = dir_size
+                experiment_dir_metadata['value']['path'] = rel_path
+                experiment_dir_metadata['value']['name'] = dir_name.split(os.path.sep)[-1]
+                experiment_dir_metadata['value']['permissions'] = 'READ'
+                experiment_dir_metadata['value']['systemId'] = agave_system
+                experiment_dir_metadata['value']['type'] = 'dir'
+                experiment_dir_metadata['value']['legacy'] = 'true'
+                experiment_dir_metadata['value']['deleted'] = 'false'
+
+                experiment_dir_metadata_json = json.dumps(experiment_dir_metadata)
+                logging.debug('walk_project_directory - experiment_dir_metadata_json:')
+                logging.debug(experiment_dir_metadata_json)
+                logging.debug('walk_project_directory - before meta.addMetadata')
+                experiment_dir_metadata_uuid = agave.meta.addMetadata(body=experiment_dir_metadata_json)
+                logging.debug('walk_project_directory - after meta.addMetadata - experiment_dir_metadata_uuid:')
+                logging.debug(experiment_dir_metadata_uuid['uuid'])
+
+                # set public permissions
+                set_metadata_public_permissions(agave, experiment_dir_metadata_uuid['uuid'], 'world', 'READ')
+                ########################## end insert exp dir ##################
 
                 for fname in file_list:
                     logging.debug('\twalk_project_directory - Inserting experiment file: ' +  fname)
@@ -243,41 +283,47 @@ def walk_project_directory(root_dir, agave, agave_system, cursor, project_metada
                     # set public permissions
                     set_metadata_public_permissions(agave, experiment_file_metadata_uuid['uuid'], 'world', 'READ')
 
-                ########################## insert exp dir last so you grab the total size ##################
-                dir_size = get_dir_size(dir_name)
-                logging.debug('walk_project_directory - dir_size:')
-                logging.debug(dir_size)
 
-                experiment_dir_metadata = {}
-                # experiment_dir_metadata['name'] = dir_name
-                experiment_dir_metadata['name'] = 'object'
-                experiment_dir_metadata['associationIds'] = [experiment_metadata_uuid]
-                experiment_dir_metadata['value'] = {}
-                experiment_dir_metadata['value']['format'] = 'folder'
-                experiment_dir_metadata['value']['length'] = dir_size
-                experiment_dir_metadata['value']['path'] = rel_path
-                experiment_dir_metadata['value']['name'] = dir_name.split(os.path.sep)[-1]
-                experiment_dir_metadata['value']['permissions'] = 'READ'
-                experiment_dir_metadata['value']['systemId'] = agave_system
-                experiment_dir_metadata['value']['type'] = 'dir'
-                experiment_dir_metadata['value']['legacy'] = 'true'
-                experiment_dir_metadata['value']['deleted'] = 'false'
-
-                experiment_dir_metadata_json = json.dumps(experiment_dir_metadata)
-                logging.debug('walk_project_directory - experiment_dir_metadata_json:')
-                logging.debug(experiment_dir_metadata_json)
-                logging.debug('walk_project_directory - before meta.addMetadata')
-                experiment_dir_metadata_uuid = agave.meta.addMetadata(body=experiment_dir_metadata_json)
-                logging.debug('walk_project_directory - after meta.addMetadata - experiment_dir_metadata_uuid:')
-                logging.debug(experiment_dir_metadata_uuid['uuid'])
-
-                # set public permissions
-                set_metadata_public_permissions(agave, experiment_dir_metadata_uuid['uuid'], 'world', 'READ')
-                ########################## end insert dir last so you grab the total size ##################
 
             # create project dir/files metadata
             else:
                 logging.debug('walk_project_directory - Inserting project dir metadata: ' + dir_name)
+                ########################## insert project dir  ##################
+                dir_size = get_dir_size(dir_name)
+                logging.debug('walk_project_directory - dir_size:')
+                logging.debug(dir_size)
+
+                project_dir_metadata = {}
+                project_dir_metadata['name'] = 'object'
+                project_dir_metadata['associationIds'] = [project_metadata_uuid]
+                project_dir_metadata['value'] = {}
+                project_dir_metadata['value']['format'] = 'folder'
+
+                # If creating NEES-####-####.groups dir, rel path from projects/ to /
+                if '.groups' in dir_name.split(os.path.sep)[-1]:
+                    project_dir_metadata['value']['path'] = '/'
+                else:
+                    project_dir_metadata['value']['path'] = rel_path
+
+                project_dir_metadata['value']['length'] = dir_size
+                project_dir_metadata['value']['name'] = dir_name.split(os.path.sep)[-1]
+                project_dir_metadata['value']['permissions'] = 'READ'
+                project_dir_metadata['value']['systemId'] = agave_system
+                project_dir_metadata['value']['type'] = 'dir'
+                project_dir_metadata['value']['legacy'] = 'true'
+                project_dir_metadata['value']['deleted'] = 'false'
+
+                project_dir_metadata_json = json.dumps(project_dir_metadata)
+                logging.debug('walk_project_directory - project_dir_metadata_json:')
+                logging.debug(project_dir_metadata_json)
+                logging.debug('walk_project_directory - before meta.addMetadata - project_dir_metadata_json:')
+                project_dir_metadata_uuid = agave.meta.addMetadata(body=project_dir_metadata_json)
+                logging.debug('walk_project_directory - after meta.addMetadata - project_dir_metadata_uuid:')
+                logging.debug(project_dir_metadata_uuid['uuid'])
+
+                # set public permissions
+                set_metadata_public_permissions(agave, project_dir_metadata_uuid['uuid'], 'world', 'READ')
+                ########################## end insert project dir ##################
 
                 for fname in file_list:
                     logging.debug('\twalk_project_directory - Inserting project file metadata ' + fname)
@@ -315,42 +361,7 @@ def walk_project_directory(root_dir, agave, agave_system, cursor, project_metada
                     # set public permissions
                     set_metadata_public_permissions(agave, project_file_metadata_uuid['uuid'], 'world', 'READ')
 
-                ########################## insert project dir last so you grab the total size ##################
-                dir_size = get_dir_size(dir_name)
-                logging.debug('walk_project_directory - dir_size:')
-                logging.debug(dir_size)
 
-                project_dir_metadata = {}
-                project_dir_metadata['name'] = 'object'
-                project_dir_metadata['associationIds'] = [project_metadata_uuid]
-                project_dir_metadata['value'] = {}
-                project_dir_metadata['value']['format'] = 'folder'
-
-                # If creating NEES-####-####.groups dir, rel path from projects/ to /
-                if '.groups' in dir_name.split(os.path.sep)[-1]:
-                    project_dir_metadata['value']['path'] = '/'
-                else:
-                    project_dir_metadata['value']['path'] = rel_path
-
-                project_dir_metadata['value']['length'] = dir_size
-                project_dir_metadata['value']['name'] = dir_name.split(os.path.sep)[-1]
-                project_dir_metadata['value']['permissions'] = 'READ'
-                project_dir_metadata['value']['systemId'] = agave_system
-                project_dir_metadata['value']['type'] = 'dir'
-                project_dir_metadata['value']['legacy'] = 'true'
-                project_dir_metadata['value']['deleted'] = 'false'
-
-                project_dir_metadata_json = json.dumps(project_dir_metadata)
-                logging.debug('walk_project_directory - project_dir_metadata_json:')
-                logging.debug(project_dir_metadata_json)
-                logging.debug('walk_project_directory - before meta.addMetadata - project_dir_metadata_json:')
-                project_dir_metadata_uuid = agave.meta.addMetadata(body=project_dir_metadata_json)
-                logging.debug('walk_project_directory - after meta.addMetadata - project_dir_metadata_uuid:')
-                logging.debug(project_dir_metadata_uuid['uuid'])
-
-                # set public permissions
-                set_metadata_public_permissions(agave, project_dir_metadata_uuid['uuid'], 'world', 'READ')
-                ########################## end insert project dir last so you grab the total size ##################
         except Exception, e:
             logging.debug('walk_project_directory - Exception: ')
             logging.debug(e)
@@ -398,7 +409,7 @@ def main(args):
     # metadata_in_system = agave.meta.listMetadata(q=json.dumps(metadata_object))
     #
     # if not metadata_in_system:
-    project_metadata_uuid = insert_project_metadata(root_dir, cursor, agave, logging)
+    project_metadata_uuid = insert_project_metadata(root_dir, agave_system, cursor, agave, logging)
     if not project_metadata_uuid:
         logging.debug('main - could not insert project metadata, skipping this project')
     else:
