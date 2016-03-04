@@ -59,8 +59,8 @@ def insert_project_metadata(root_dir, agave_system, cursor, agave, logging):
     for row_dict in project_rows_dict_list:
 
         # pis
-        # cursor.execute('select FIRST_NAME, LAST_NAME from PROJECT_GROUP a join PERSON b on a.person_id = b.id where a.projid = ' + str(row_dict['projid']));
         cursor.execute('select distinct p.last_name, p.first_name from person p, authorization a, person_entity_role per, project pr where p.id = a.person_id and p.deleted = 0 and a.entity_type_id = 1 and p.id = per.person_id and a.entity_type_id = per.entity_type_id and a.entity_id = per.entity_id and pr.projid = per.entity_id  and (per.role_id = 1 or per.role_id = 2) and pr.projid = ' + str(row_dict['projid']));
+
 
         pis_dict_list = convert_rows_to_dict_list(cursor)
         row_dict['pis'] = pis_dict_list
@@ -70,6 +70,18 @@ def insert_project_metadata(root_dir, agave_system, cursor, agave, logging):
         organization_dict_list = convert_rows_to_dict_list(cursor)
         if (bool(organization_dict_list) != False):
             row_dict['organization'] = organization_dict_list
+
+
+        # sponsor
+        cursor.execute('select fund_org, award_num, award_url from project_grant where projid = ' + str(row_dict['projid']))
+        sponsor_rows_dict_list = convert_rows_to_dict_list(cursor)
+        if (bool(sponsor_rows_dict_list) != False):
+            row_dict['sponsor'] = []
+            for sponsor_dict in sponsor_rows_dict_list:
+                sponsor_object = {}
+                sponsor_object['name'] = str(sponsor_dict.get('fundOrg')) + '-' + str(sponsor_dict.get('awardNum'))
+                sponsor_object['url'] = str(sponsor_dict.get('awardUrl'))
+                row_dict['sponsor'].append(sponsor_object)
 
         # facility
         cursor.execute('select distinct c.name, c.state, c.country from experiment a join experiment_facility b on a.expid = b.expid join organization c on b.facilityid = c.facilityid where a.projid = ' + str(row_dict['projid']))
@@ -162,14 +174,28 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, cursor, 
         if (bool(experiment_type_rows_dict_list) != False):
             row_dict['type'] = experiment_type_rows_dict_list[0].get('displayName')
 
+        # equipment
+        cursor.execute("select distinct  pe.name as equipment, e.name as component, ec.class_name as equipment_class, org.name as facility from equipment e inner join experiment_equipment ee on e.equipment_id = ee.equipment_id inner join experiment ex on ee.experiment_id = ex.expid inner join equipment_model em on e.model_id = em.id inner join equipment_class ec on em.equipment_class_id = ec.equipment_class_id inner join organization org on e.orgid = org.orgid left outer join equipment pe on pe.equipment_id = e.parent_id where ex.projid = " + "\'" + str(project_id) + "\'" + " and ex.expid = " + "\'" + str(row_dict['expid']) + "\'"  + " order by pe.name, e.name")
+        equipment_dict_list = convert_rows_to_dict_list(cursor)
+        row_dict['equipment'] = equipment_dict_list
+
+        # specimen type
+        cursor.execute("select distinct b.title as name, b.description as description from experiment a join specimen b on a.expid = b.expid join specimen_component c on b.id = c.specimen_id where a.projid = " + "\'" + str(project_id) + "\'" + " and a.name = " + "\'" + str(experiment_name) + "\'" )
+        specimen_type_rows_dict_list = convert_rows_to_dict_list(cursor)
+        specimen_type_list = []
+        for specimen_row_dict in specimen_type_rows_dict_list:
+            specimen_type_list.append(specimen_row_dict)
+        if len(specimen_type_list) > 0:
+            row_dict['specimenType'] = specimen_type_list
+
         # facility
-        cursor.execute("select distinct c.name, c.state, c.country from experiment a join experiment_facility b on a.expid = b.expid join organization c on b.facilityid = c.facilityid where a.projid =" + "\'" + str(row_dict['projid']) + "\'" + " and a.name = " + "\'" + str(experiment_name) + "\'" )
+        cursor.execute("select distinct c.name, c.state, c.country from experiment a join experiment_facility b on a.expid = b.expid join organization c on b.facilityid = c.facilityid where a.projid = " + "\'" + str(row_dict['projid']) + "\'" + " and a.name = " + "\'" + str(experiment_name) + "\'" )
         facility_dict_list = convert_rows_to_dict_list(cursor)
         if (bool(facility_dict_list) != False):
             row_dict['facility'] = facility_dict_list
 
         # material
-        cursor.execute("select distinct c.id, c.title from experiment a join specimen b on a.expid = b.expid join specimen_component c on b.id = c.specimen_id where a.projid = " + "\'" + str(row_dict['projid']) + "\'" + " and a.expid = " + "\'" + str(row_dict['expid']) + "\'" )
+        cursor.execute("select distinct c.id, c.title from experiment a join specimen b on a.expid = b.expid join specimen_component c on b.id = c.specimen_id where a.projid = " + "\'" + str(row_dict['projid']) + "\'" + " and a.expid = " + "\'" + str(row_dict['expid']) + "\'" + " order by c.title" )
         materials_rows_dict_list = convert_rows_to_dict_list(cursor)
         if (bool(materials_rows_dict_list) != False):
             row_dict['material'] = []
@@ -185,6 +211,15 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, cursor, 
                 component_material['materials'] = component_material_list
                 row_dict['material'].append(component_material)
 
+        # sensors
+        cursor.execute("select name from location_plan where expid = " + "\'" + str(row_dict['expid']) + "\'" + " order by name")
+        sensors_rows_dict_list = convert_rows_to_dict_list(cursor)
+
+        if (bool(sensors_rows_dict_list) != False):
+            row_dict['sensors'] = []
+            for sensor in sensors_rows_dict_list:
+                row_dict['sensors'].append(sensor.get('name'))
+
         # clean dates & description
         if row_dict['startDate'] is not None:
             row_dict['startDate'] = row_dict['startDate'].strftime('%Y-%m-%d %H:%M:%S')
@@ -193,10 +228,15 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, cursor, 
             row_dict['endDate'] = row_dict['endDate'].strftime('%Y-%m-%d %H:%M:%S')
 
         if 'description4K' in row_dict:
-            row_dict['description'] = row_dict['description4K']
-            del row_dict['description4K']
+            if row_dict['description4K'] is None:
+                del row_dict['description4K']
+            else :
+                row_dict['description'] = row_dict['description4K']
+                del row_dict['description4K']
         if 'projid' in row_dict:
             del row_dict['projid']
+        if 'expid' in row_dict:
+            del row_dict['expid']
 
         # create and insert experiment metadata
         # experiment_dir_path = hashlib.md5(NEES-####-####.groups/Experiment-#)
