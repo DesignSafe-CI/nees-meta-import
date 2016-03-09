@@ -78,7 +78,7 @@ def insert_project_metadata(root_dir, agave_system, central_cursor, neeshub_curs
 
         # publications
         project_owner = project_name.replace("-", "_").lower()
-        neeshub_cursor.execute("select distinct (r.id), r.title from jos_resources r inner join jos_xgroups g on g.cn = r.group_owner left outer join jos_xgroups_members gm on gm.gidNumber = g.gidNumber left outer join jos_users u on u.id = gm.uidNumber where r.group_owner = " + "\'" + str(project_owner) + "\'")
+        neeshub_cursor.execute("select distinct r.title, r.id from jos_resources r inner join jos_xgroups g on g.cn = r.group_owner left outer join jos_xgroups_members gm on gm.gidNumber = g.gidNumber left outer join jos_users u on u.id = gm.uidNumber where r.group_owner = " + "\'" + str(project_owner) + "\'" + " group by r.title")
         publications_rows_dict_list = neeshub_cursor.fetchall()
         if (bool(publications_rows_dict_list) != False):
             row_dict['publications'] = []
