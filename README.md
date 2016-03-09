@@ -32,7 +32,7 @@ Note: You have to Accept Oracle's License Agreement. I downloaded from browser a
     $ cd $WORK
     $ git https://username@github.com:DesignSafe-CI/nees-meta-import.git
     $ cd nees-meta-import/elastic
-Edit config.properties [agave], [nees]
+Edit config.properties [nees-central], [nees-neeshub]
 
 ---
 
@@ -50,4 +50,4 @@ To run and index all directories with a single job:
     $ cd $WORK/nees-meta-import/elastic
     $ run.sh
 
-Note: To run and index files in agave metadata, repeat steps above but use ```nees-meta-import/agave``` direcotory.
+Note: You must have a current reservation in wrangler to run the job (see ```--reservation=NHERI``` in run.sh) and make sure that  ```/corral-repl/tacc/NHERI/public/projects``` is mounted. To run and index files in agave metadata, repeat steps above but use ```nees-meta-import/agave``` direcotory.
