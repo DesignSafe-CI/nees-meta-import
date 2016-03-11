@@ -9,6 +9,10 @@ import time
 import urllib
 import hashlib
 import MySQLdb
+import sys
+
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 def convert_rows_to_dict_list(cursor):
     columns = list()
