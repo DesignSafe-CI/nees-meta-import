@@ -41,93 +41,95 @@ def insert_project_metadata(root_dir, agave_system, central_cursor, neeshub_curs
     logging.debug('insert_project_metadata - project_name: ' + project_name)
     central_cursor.execute("select projid from project where name = " + "\'" + str(project_name) + "\'")
     project_rows_dict_list = convert_rows_to_dict_list(central_cursor)
-    project_id = project_rows_dict_list[0]['projid']
 
-    central_cursor.execute("select projid, name, title, start_date, end_date, description_4k from project where projid = " + "\'" + str(project_id) + "\'")
-    project_rows_dict_list = convert_rows_to_dict_list(central_cursor)
-    for row_dict in project_rows_dict_list:
+    if (bool(project_rows_dict_list) != False):
+        project_id = project_rows_dict_list[0]['projid']
 
-        # pis
-        central_cursor.execute('select distinct p.last_name, p.first_name from person p, authorization a, person_entity_role per, project pr where p.id = a.person_id and p.deleted = 0 and a.entity_type_id = 1 and p.id = per.person_id and a.entity_type_id = per.entity_type_id and a.entity_id = per.entity_id and pr.projid = per.entity_id  and (per.role_id = 1 or per.role_id = 2) and pr.projid = ' + str(row_dict['projid']));
-        pis_dict_list = convert_rows_to_dict_list(central_cursor)
-        row_dict['pis'] = pis_dict_list
+        central_cursor.execute("select projid, name, title, start_date, end_date, description_4k from project where projid = " + "\'" + str(project_id) + "\'")
+        project_rows_dict_list = convert_rows_to_dict_list(central_cursor)
+        for row_dict in project_rows_dict_list:
 
-        # organization
-        central_cursor.execute('select b.name, b.state, b.country from project_organization a join organization b on a.orgid = b.orgid where a.projid = ' + str(row_dict['projid']))
-        organization_dict_list = convert_rows_to_dict_list(central_cursor)
-        if (bool(organization_dict_list) != False):
-            row_dict['organization'] = organization_dict_list
+            # pis
+            central_cursor.execute('select distinct p.last_name, p.first_name from person p, authorization a, person_entity_role per, project pr where p.id = a.person_id and p.deleted = 0 and a.entity_type_id = 1 and p.id = per.person_id and a.entity_type_id = per.entity_type_id and a.entity_id = per.entity_id and pr.projid = per.entity_id  and (per.role_id = 1 or per.role_id = 2) and pr.projid = ' + str(row_dict['projid']));
+            pis_dict_list = convert_rows_to_dict_list(central_cursor)
+            row_dict['pis'] = pis_dict_list
 
-        # sponsor
-        central_cursor.execute('select fund_org, award_num, award_url from project_grant where projid = ' + str(row_dict['projid']))
-        sponsor_rows_dict_list = convert_rows_to_dict_list(central_cursor)
-        if (bool(sponsor_rows_dict_list) != False):
-            row_dict['sponsor'] = []
-            for sponsor_dict in sponsor_rows_dict_list:
-                sponsor_object = {}
-                sponsor_object['name'] = str(sponsor_dict.get('fundOrg')) + '-' + str(sponsor_dict.get('awardNum'))
-                sponsor_object['url'] = str(sponsor_dict.get('awardUrl'))
-                row_dict['sponsor'].append(sponsor_object)
+            # organization
+            central_cursor.execute('select b.name, b.state, b.country from project_organization a join organization b on a.orgid = b.orgid where a.projid = ' + str(row_dict['projid']))
+            organization_dict_list = convert_rows_to_dict_list(central_cursor)
+            if (bool(organization_dict_list) != False):
+                row_dict['organization'] = organization_dict_list
 
-        # facility
-        central_cursor.execute('select distinct c.name, c.state, c.country from experiment a join experiment_facility b on a.expid = b.expid join organization c on b.facilityid = c.facilityid where a.projid = ' + str(row_dict['projid']))
-        facility_rows_dict_list = convert_rows_to_dict_list(central_cursor)
-        if (bool(facility_rows_dict_list) != False):
-            row_dict['facility'] = facility_rows_dict_list
+            # sponsor
+            central_cursor.execute('select fund_org, award_num, award_url from project_grant where projid = ' + str(row_dict['projid']))
+            sponsor_rows_dict_list = convert_rows_to_dict_list(central_cursor)
+            if (bool(sponsor_rows_dict_list) != False):
+                row_dict['sponsor'] = []
+                for sponsor_dict in sponsor_rows_dict_list:
+                    sponsor_object = {}
+                    sponsor_object['name'] = str(sponsor_dict.get('fundOrg')) + '-' + str(sponsor_dict.get('awardNum'))
+                    sponsor_object['url'] = str(sponsor_dict.get('awardUrl'))
+                    row_dict['sponsor'].append(sponsor_object)
 
-        # equipment
-        central_cursor.execute("select distinct  pe.name as equipment, e.name as component, ec.class_name as equipment_class, org.name as facility from equipment e inner join experiment_equipment ee on e.equipment_id = ee.equipment_id inner join experiment ex on ee.experiment_id = ex.expid inner join equipment_model em on e.model_id = em.id inner join equipment_class ec on em.equipment_class_id = ec.equipment_class_id inner join organization org on e.orgid = org.orgid left outer join equipment pe on pe.equipment_id = e.parent_id where ex.projid = " + "\'" + str(project_id) + "\'" + " order by pe.name, e.name")
-        equipment_dict_list = convert_rows_to_dict_list(central_cursor)
-        row_dict['equipment'] = equipment_dict_list
+            # facility
+            central_cursor.execute('select distinct c.name, c.state, c.country from experiment a join experiment_facility b on a.expid = b.expid join organization c on b.facilityid = c.facilityid where a.projid = ' + str(row_dict['projid']))
+            facility_rows_dict_list = convert_rows_to_dict_list(central_cursor)
+            if (bool(facility_rows_dict_list) != False):
+                row_dict['facility'] = facility_rows_dict_list
 
-        # publications
-        project_owner = project_name.replace("-", "_").lower()
-        neeshub_cursor.execute("select distinct r.title, r.id from jos_resources r inner join jos_xgroups g on g.cn = r.group_owner left outer join jos_xgroups_members gm on gm.gidNumber = g.gidNumber left outer join jos_users u on u.id = gm.uidNumber where r.group_owner = " + "\'" + str(project_owner) + "\'" + " group by r.title")
-        publications_rows_dict_list = neeshub_cursor.fetchall()
-        if (bool(publications_rows_dict_list) != False):
-            row_dict['publications'] = []
-            for publication_dict in publications_rows_dict_list:
-                publication_object = {}
-                publication_object['title'] = publication_dict['title']
-                neeshub_cursor.execute("select distinct n.name as xname from jos_author_assoc a left outer join jos_users u on u.id = a.authorid left outer join jos_xprofiles n on a.authorid = n.uidnumber where a.subtable='resources' and a.subid = " + "\'" + str(publication_dict['id']) + "\'" + " order by ordering, surname, givenname, middlename")
-                publication_authors_dict = neeshub_cursor.fetchall()
-                if (bool(publication_authors_dict) != False):
-                    publication_object['authors'] = []
-                    for publication_author in publication_authors_dict:
-                        publication_object['authors'].append(publication_author['xname'])
-                row_dict['publications'].append(publication_object)
+            # equipment
+            central_cursor.execute("select distinct  pe.name as equipment, e.name as component, ec.class_name as equipment_class, org.name as facility from equipment e inner join experiment_equipment ee on e.equipment_id = ee.equipment_id inner join experiment ex on ee.experiment_id = ex.expid inner join equipment_model em on e.model_id = em.id inner join equipment_class ec on em.equipment_class_id = ec.equipment_class_id inner join organization org on e.orgid = org.orgid left outer join equipment pe on pe.equipment_id = e.parent_id where ex.projid = " + "\'" + str(project_id) + "\'" + " order by pe.name, e.name")
+            equipment_dict_list = convert_rows_to_dict_list(central_cursor)
+            row_dict['equipment'] = equipment_dict_list
 
-        # clean object
-        if row_dict['startDate'] is not None:
-            row_dict['startDate'] = row_dict['startDate'].strftime('%Y-%m-%d %H:%M:%S')
+            # publications
+            project_owner = project_name.replace("-", "_").lower()
+            neeshub_cursor.execute("select distinct r.title, r.id from jos_resources r inner join jos_xgroups g on g.cn = r.group_owner left outer join jos_xgroups_members gm on gm.gidNumber = g.gidNumber left outer join jos_users u on u.id = gm.uidNumber where r.group_owner = " + "\'" + str(project_owner) + "\'" + " group by r.title")
+            publications_rows_dict_list = neeshub_cursor.fetchall()
+            if (bool(publications_rows_dict_list) != False):
+                row_dict['publications'] = []
+                for publication_dict in publications_rows_dict_list:
+                    publication_object = {}
+                    publication_object['title'] = publication_dict['title']
+                    neeshub_cursor.execute("select distinct n.name as xname from jos_author_assoc a left outer join jos_users u on u.id = a.authorid left outer join jos_xprofiles n on a.authorid = n.uidnumber where a.subtable='resources' and a.subid = " + "\'" + str(publication_dict['id']) + "\'" + " order by ordering, surname, givenname, middlename")
+                    publication_authors_dict = neeshub_cursor.fetchall()
+                    if (bool(publication_authors_dict) != False):
+                        publication_object['authors'] = []
+                        for publication_author in publication_authors_dict:
+                            publication_object['authors'].append(publication_author['xname'])
+                    row_dict['publications'].append(publication_object)
 
-        if row_dict['endDate'] is not None:
-            row_dict['endDate'] = row_dict['endDate'].strftime('%Y-%m-%d %H:%M:%S')
+            # clean object
+            if row_dict['startDate'] is not None:
+                row_dict['startDate'] = row_dict['startDate'].strftime('%Y-%m-%d %H:%M:%S')
 
-        if 'description4K' in row_dict:
-            row_dict['description'] = row_dict['description4K']
-            del row_dict['description4K']
-        if 'projid' in row_dict:
-            del row_dict['projid']
+            if row_dict['endDate'] is not None:
+                row_dict['endDate'] = row_dict['endDate'].strftime('%Y-%m-%d %H:%M:%S')
 
-        # create and insert project metadata
-        project_metadata = {}
-        project_metadata = row_dict
-        project_metadata['_index'] = _index
-        project_metadata['_type'] = 'project'
-        project_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
-        project_metadata['deleted'] = 'false'
-        project_metadata['systemId'] = agave_system
-        project_metadata['projectPath'] = os.path.basename(os.path.normpath(root_dir))
+            if 'description4K' in row_dict:
+                row_dict['description'] = row_dict['description4K']
+                del row_dict['description4K']
+            if 'projid' in row_dict:
+                del row_dict['projid']
 
-        try:
-            logging.debug('insert_project_metadata - project_metadata.append')
-            project_objects.append(project_metadata)
-            logging.debug('insert_project_metadata - project_metadata.append')
-            return root_dir
-        except Exception, e:
-            logging.debug('insert_project_metadata - FAIL - project_metadata.append:')
-            logging.debug(e)
+            # create and insert project metadata
+            project_metadata = {}
+            project_metadata = row_dict
+            project_metadata['_index'] = _index
+            project_metadata['_type'] = 'project'
+            project_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
+            project_metadata['deleted'] = 'false'
+            project_metadata['systemId'] = agave_system
+            project_metadata['projectPath'] = os.path.basename(os.path.normpath(root_dir))
+
+            try:
+                logging.debug('insert_project_metadata - project_metadata.append')
+                project_objects.append(project_metadata)
+                logging.debug('insert_project_metadata - project_metadata.append')
+                return root_dir
+            except Exception, e:
+                logging.debug('insert_project_metadata - FAIL - project_metadata.append:')
+                logging.debug(e)
 
 def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_cursor, neeshub_cursor, project_objects, project_metadata_id, _index):
     logging.debug('insert_experiment_metadata')
