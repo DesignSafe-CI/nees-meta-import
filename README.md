@@ -11,6 +11,7 @@ Walker scripts to add/update NEES files into Agave metadata or Elasticsearch
     $ cd $HOME
     $ mkdir oracle
     $ cd oracle
+    $
 
 Download:
 1. [instantclient-basic-linux.x64-12.1.0.2.0.zip](http://www.oracle.com/technetwork/topics/linuxx86-64soft-092277.html)
@@ -32,11 +33,18 @@ Note: You have to Accept Oracle's License Agreement. I downloaded from browser a
     $ cd $WORK
     $ git https://username@github.com:DesignSafe-CI/nees-meta-import.git
     $ cd nees-meta-import/elastic
-Edit config.properties [nees-central], [nees-neeshub]
+Edit config.properties [nees-central], [nees-neeshub], [agave], [es]
 
 ---
 
 ## Run
+Setup virtual environment
+    $ module load python (skip if mac)
+    $ source virtualenvwrapper.sh (skip if mac)
+    $ mkvirtualenv dsimport
+    $ pip install cx_Oracle
+    $ pip install elasticsearch
+    $ pip install MySQLdb
 
 To run and index a single NEES-####-####.groups directory:
 

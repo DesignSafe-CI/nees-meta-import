@@ -10,9 +10,92 @@ import urllib
 import hashlib
 import MySQLdb
 import sys
+import optparse
+import urllib2
 
 reload(sys)
 sys.setdefaultencoding('utf8')
+
+Config = ConfigParser.ConfigParser()
+Config.read(os.path.realpath(__file__).rsplit(os.path.sep, 1)[0] + '/config.properties')
+
+
+############################ EZID client ##############################
+class MyHelpFormatter (optparse.IndentedHelpFormatter):
+  def format_usage (self, usage):
+    return USAGE_TEXT
+
+class MyHTTPErrorProcessor (urllib2.HTTPErrorProcessor):
+  def http_response (self, request, response):
+    if response.code == 201:
+      return response
+    else:
+      return urllib2.HTTPErrorProcessor.http_response(self, request, response)
+  https_response = http_response
+
+class MyHelpFormatter (optparse.IndentedHelpFormatter):
+  def format_usage (self, usage):
+    return USAGE_TEXT
+
+class MyHTTPErrorProcessor (urllib2.HTTPErrorProcessor):
+  def http_response (self, request, response):
+    if response.code == 201:
+      return response
+    else:
+      return urllib2.HTTPErrorProcessor.http_response(self, request, response)
+  https_response = http_response
+
+ezid_server = Config.get('ezid', 'server')
+ezid_username = Config.get('ezid', 'username')
+ezid_password = Config.get('ezid', 'password')
+
+h = urllib2.HTTPBasicAuthHandler()
+h.add_password("EZID", ezid_server, ezid_username, ezid_password)
+ezid_opener = urllib2.build_opener(MyHTTPErrorProcessor())
+ezid_opener.add_handler(h)
+
+def issueRequest (path, method, data=None, returnHeaders=False,
+  streamOutput=False):
+  request = urllib2.Request("%s/%s" % (ezid_server, path))
+  request.get_method = lambda: method
+  if data:
+    request.add_header("Content-Type", "text/plain; charset=UTF-8")
+    request.add_data(data.encode("UTF-8"))
+  # if _cookie: request.add_header("Cookie", _cookie)
+  try:
+    connection = ezid_opener.open(request)
+    if streamOutput:
+      while True:
+        sys.stdout.write(connection.read(1))
+        sys.stdout.flush()
+    else:
+      response = connection.read()
+      if returnHeaders:
+        return response.decode("UTF-8"), connection.info()
+      else:
+        return response.decode("UTF-8")
+  except urllib2.HTTPError, e:
+    sys.stderr.write("%d %s\n" % (e.code, e.msg))
+    if e.fp != None:
+      response = e.fp.read()
+      if not response.endswith("\n"): response += "\n"
+      sys.stderr.write(response)
+    sys.exit(1)
+
+def encode (id):
+    return urllib.quote(id, ":/")
+
+# def printAnvlResponse (response, sortLines=False):
+#   response = response.splitlines()
+#   if sortLines and len(response) >= 1:
+#     statusLine = response[0]
+#     response = response[1:]
+#     response.sort()
+#     response.insert(0, statusLine)
+#   for line in response:
+#     print line
+
+############################ EZID client ##############################
 
 def convert_rows_to_dict_list(cursor):
     columns = list()
@@ -90,7 +173,7 @@ def insert_project_metadata(root_dir, agave_system, central_cursor, neeshub_curs
                 row_dict['publications'] = []
                 for publication_dict in publications_rows_dict_list:
                     publication_object = {}
-                    publication_object['title'] = publication_dict['title']
+                    publication_object['title'] = publication_dict['title'].decode("utf-8", "ignore")
                     neeshub_cursor.execute("select distinct n.name as xname from jos_author_assoc a left outer join jos_users u on u.id = a.authorid left outer join jos_xprofiles n on a.authorid = n.uidnumber where a.subtable='resources' and a.subid = " + "\'" + str(publication_dict['id']) + "\'" + " order by ordering, surname, givenname, middlename")
                     publication_authors_dict = neeshub_cursor.fetchall()
                     if (bool(publication_authors_dict) != False):
@@ -120,6 +203,7 @@ def insert_project_metadata(root_dir, agave_system, central_cursor, neeshub_curs
             project_metadata['_id'] = hashlib.md5(row_dict['name']).hexdigest()
             project_metadata['deleted'] = 'false'
             project_metadata['systemId'] = agave_system
+            project_metadata['project'] = os.path.basename(os.path.normpath(root_dir))
             project_metadata['projectPath'] = os.path.basename(os.path.normpath(root_dir))
 
             try:
@@ -166,6 +250,26 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
         experiment_doi_rows_dict_list = convert_rows_to_dict_list(central_cursor)
         if (bool(experiment_doi_rows_dict_list) != False):
             row_dict['doi'] = experiment_doi_rows_dict_list[0]['doi']
+
+            # update DOI
+            try:
+                path = "id/doi:"+encode(str(row_dict['doi']))
+                ezid_new_target = 'target: ' + Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
+                logging.debug(ezid_new_target)
+                ezid_response = issueRequest("id/"+encode(id), "POST", ezid_new_target)
+                ezid_response = ezid_response.splitlines()
+                ezid_response_dict = {}
+                logging.debug('insert_experiment_metadata - SUCCESS - insertDOI:')
+                logging.debug(ezid_response)
+                for line in ezid_response:
+                    key,value = line.split(":",1)
+                    ezid_response_dict[key] = value
+                logging.debug(ezid_response_dict.get('success'))
+
+            except Exception, e:
+                logging.debug('insert_experiment_metadata - FAIL - insertDOI:')
+                logging.debug(e)
+
 
         # experiment type
         central_cursor.execute("select b.display_name from experiment a join experiment_domain b on a.experiment_domain_id = b.id where a.projid = " + "\'" + str(project_id) + "\'" + " and a.name = " + "\'" + str(experiment_name) + "\'" )
@@ -246,7 +350,7 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
         experiment_metadata['_index'] = _index
         experiment_metadata['_type'] = 'experiment'
         experiment_metadata['_id'] = hashlib.md5(experiment_dir_path).hexdigest()
-        experiment_metadata['project'] = project_metadata_id.split('.')[0]
+        experiment_metadata['project'] = project_metadata_id
         experiment_metadata['deleted'] = 'false'
         experiment_metadata['systemId'] = agave_system
         experiment_metadata['experimentPath'] = experiment_dir_path
@@ -401,7 +505,7 @@ def walk_project_directory(root_dir, project_objects, agave_system, central_curs
                     project_file_metadata['_index'] = _index
                     project_file_metadata['_type'] = 'object'
                     project_file_metadata['_id'] = hashlib.md5(agave_path).hexdigest()
-                    project_file_metadata['project'] = root_dir.split('.')[0]
+                    project_file_metadata['project'] = root_dir
                     project_file_metadata['format'] = 'raw'
                     project_file_metadata['length'] = file_size
                     project_file_metadata['path'] = dir_name
@@ -420,8 +524,6 @@ def walk_project_directory(root_dir, project_objects, agave_system, central_curs
             logging.debug(e)
 
 def main(args):
-    Config = ConfigParser.ConfigParser()
-    Config.read(os.path.realpath(__file__).rsplit(os.path.sep, 1)[0] + '/config.properties')
 
     # nees central db auth
     central_user=Config.get('nees-central', 'user')
@@ -470,8 +572,8 @@ def main(args):
         walk_project_directory(root_dir, project_objects, agave_system, central_cursor, neeshub_cursor, project_metadata_id, logging, project_dir_size, _index)
         logging.debug('main - after inserting project: ' + root_dir)
         project_objects_tuple = tuple(project_objects)
-        es = Elasticsearch([Config.get('es', 'es_server')])
-        project_objects_inserted = helpers.bulk(es, project_objects_tuple)
+        # es = Elasticsearch([Config.get('es', 'es_server')])
+        # project_objects_inserted = helpers.bulk(es, project_objects_tuple)
 
 
 if len(sys.argv) < 2:
