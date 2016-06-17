@@ -39,6 +39,7 @@ Edit config.properties [nees-central], [nees-neeshub], [agave], [es]
 
 ## Run
 Setup virtual environment
+
     $ module load python (skip if mac)
     $ source virtualenvwrapper.sh (skip if mac)
     $ mkvirtualenv dsimport
