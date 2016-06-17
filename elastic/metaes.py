@@ -256,15 +256,8 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
                 path = "id/doi:"+encode(str(row_dict['doi']))
                 ezid_new_target = 'target: ' + Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
                 logging.debug(ezid_new_target)
-                ezid_response = issueRequest("id/"+encode(id), "POST", ezid_new_target)
-                ezid_response = ezid_response.splitlines()
-                ezid_response_dict = {}
-                logging.debug('insert_experiment_metadata - SUCCESS - insertDOI:')
+                ezid_response = issueRequest(path, "POST", ezid_new_target)
                 logging.debug(ezid_response)
-                for line in ezid_response:
-                    key,value = line.split(":",1)
-                    ezid_response_dict[key] = value
-                logging.debug(ezid_response_dict.get('success'))
 
             except Exception, e:
                 logging.debug('insert_experiment_metadata - FAIL - insertDOI:')
