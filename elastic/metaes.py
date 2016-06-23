@@ -251,10 +251,10 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
         if (bool(experiment_doi_rows_dict_list) != False):
             row_dict['doi'] = experiment_doi_rows_dict_list[0]['doi']
 
-            # update DOI
+            # update DOI: http://ezid.cdlib.org/doc/apidoc.html#internal-metadata
             try:
                 path = "id/doi:"+encode(str(row_dict['doi']))
-                ezid_new_target = 'target: ' + Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
+                ezid_new_target = '_target: ' + Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
                 logging.debug(ezid_new_target)
                 ezid_response = issueRequest(path, "POST", ezid_new_target)
                 logging.debug(ezid_response)
