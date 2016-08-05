@@ -257,8 +257,9 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
                     logging.debug('insert_experiment_metadata - replace DOI:')
                     logging.debug(str(row_dict['doi']));
                     doi_dict = {}
-                    doi_dict['_profile'] = 'erc'
                     doi_dict['_owner'] = 'uta_tacc'
+                    doi_dict['_profile'] = 'datacite'
+                    # doi_dict['_status'] = 'reserved'
                     doi_dict['_target'] = Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
 
                     # get pis for erc.who
@@ -269,9 +270,11 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
                         author = ', '.join(['{}'.format(v) for k,v in pi_dict.iteritems()])
                         authors = authors + author + ' ; '
 
-                    doi_dict['erc.who'] = authors
-                    doi_dict['erc.what'] = row_dict['title']
-                    doi_dict['erc.when'] = '2016'
+                    doi_dict['datacite.creator'] = authors
+                    doi_dict['datacite.title'] = row_dict['title']
+                    doi_dict['datacite.publicationyear'] = '2016'
+                    doi_dict['datacite.publisher'] = 'Network for Earthquake Engineering Simulation (NEES)'
+                    doi_dict['datacite.resourcetype'] = 'Dataset'
 
                     data = '\n'.join(['{}:{}'.format(k,v) for k,v in doi_dict.iteritems()])
 
@@ -599,9 +602,9 @@ def main(args):
         project_dir_size = 0
         walk_project_directory(root_dir, project_objects, agave_system, central_cursor, neeshub_cursor, project_metadata_id, logging, project_dir_size, _index)
         logging.debug('main - after inserting project: ' + root_dir)
-        # project_objects_tuple = tuple(project_objects)
-        # es = Elasticsearch([Config.get('es', 'es_server')])
-        # project_objects_inserted = helpers.bulk(es, project_objects_tuple)
+        project_objects_tuple = tuple(project_objects)
+        es = Elasticsearch([Config.get('es', 'es_server')])
+        project_objects_inserted = helpers.bulk(es, project_objects_tuple)
 
 
 if len(sys.argv) < 2:
