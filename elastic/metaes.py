@@ -285,6 +285,12 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
                     response = issueRequest("shoulder/" + encode(shoulder), "POST", data)
                     logging.debug(response)
 
+                    # replace bad doi
+                    if 'success:' in response:
+                        row_dict['doi'] = response.split()[1]
+                        logging.debug('insert_experiment_metadata - replaced DOI:')
+                        logging.debug(row_dict['doi'])
+
                 except Exception, e:
                     logging.debug('insert_experiment_metadata - FAIL - createDOI:')
                     logging.debug(e)
