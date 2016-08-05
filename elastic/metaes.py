@@ -287,9 +287,17 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
 
                     # replace bad doi
                     if 'success:' in response:
+                        logging.debug('######################################################')
+                        logging.debug('replacing DOI')
+                        logging.debug('project name:')
+                        logging.debug(project_name)
+                        logging.debug('project id:');
+                        logging.debug(row_dict['projid'])
+                        logging.debug('experiment name:')
+                        logging.debug(experiment_name)
+                        logging.debug('replaced ' + str(row_dict['doi']) + ' with ' + str(response.split()[1]))
+                        logging.debug('######################################################')
                         row_dict['doi'] = response.split()[1]
-                        logging.debug('insert_experiment_metadata - replaced DOI:')
-                        logging.debug(row_dict['doi'])
 
                 except Exception, e:
                     logging.debug('insert_experiment_metadata - FAIL - createDOI:')
