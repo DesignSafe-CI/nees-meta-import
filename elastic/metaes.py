@@ -674,8 +674,8 @@ def main(args):
         walk_project_directory(root_dir, project_objects, agave_system, central_cursor, neeshub_cursor, project_metadata_id, logging, project_dir_size, _index)
         logging.debug('main - after inserting project: ' + root_dir)
         project_objects_tuple = tuple(project_objects)
-        # es = Elasticsearch([Config.get('es', 'es_server')])
-        # project_objects_inserted = helpers.bulk(es, project_objects_tuple)
+        es = Elasticsearch([Config.get('es', 'es_server')])
+        project_objects_inserted = helpers.bulk(es, project_objects_tuple)
 
 
 if len(sys.argv) < 2:
