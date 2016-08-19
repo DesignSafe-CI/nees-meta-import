@@ -238,6 +238,9 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
     logging.debug( experiment_name )
 
     #insert experiment metadata
+    print 'project_name'
+    print str(experiment_name)
+
     central_cursor.execute("select projid, expid, name, title, start_date, end_date, description_4k from experiment where projid = " + "\'" + str(project_id) + "\'" + " and name = " + "\'" + str(experiment_name) + "\'" + "order by name" )
     project_rows_dict_list = convert_rows_to_dict_list(central_cursor)
 
@@ -246,20 +249,22 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
         logging.debug( row_dict['projid'] )
 
         # doi
+        print str(row_dict['expid'])
         central_cursor.execute("select b.doi from experiment a join contribution b on a.expid = b.entity_id where expid = " + "\'" + str(row_dict['expid']) + "\'")
         experiment_doi_rows_dict_list = convert_rows_to_dict_list(central_cursor)
         if (bool(experiment_doi_rows_dict_list) != False):
             row_dict['doi'] = experiment_doi_rows_dict_list[0]['doi']
+            print row_dict['doi']
 
-            # Special case - look for bad DOIs shoulder and re-create using EZID
-            if '10.5072' in row_dict['doi']:
+            # Special case #2 - Create DOI for new Experiment-*, set to reserved so it can be deleted before making public
+            if 'r: unautho' in row_dict['doi']:
                 try:
-                    logging.debug('insert_experiment_metadata - replace DOI:')
+                    logging.debug('insert_experiment_metadata - create DOI:')
                     logging.debug(str(row_dict['doi']));
                     doi_dict = {}
                     doi_dict['_owner'] = 'uta_tacc'
                     doi_dict['_profile'] = 'datacite'
-                    # doi_dict['_status'] = 'reserved'
+                    doi_dict['_status'] = 'reserved'
                     doi_dict['_target'] = Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
 
                     # get pis for erc.who
@@ -294,9 +299,9 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
                         logging.debug('project id:');
                         logging.debug(row_dict['projid'])
                         logging.debug('experiment name:')
-			logging.debug(experiment_name)
-			logging.debug('pis:')
-			logging.debug(str(doi_dict['datacite.creator']))
+                        logging.debug(experiment_name)
+                        logging.debug('pis:')
+                        logging.debug(str(doi_dict['datacite.creator']))
                         logging.debug('replaced ' + str(row_dict['doi']) + ' with ' + str(response.split()[1]))
                         logging.debug('######################################################')
                         row_dict['doi'] = response.split()[1]
@@ -304,6 +309,61 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
                 except Exception, e:
                     logging.debug('insert_experiment_metadata - FAIL - createDOI:')
                     logging.debug(e)
+
+
+            # Special case #1 - look for bad DOIs shoulder and re-create using EZID
+            # if '10.5072' in row_dict['doi']:
+            #     try:
+            #         logging.debug('insert_experiment_metadata - replace DOI:')
+            #         logging.debug(str(row_dict['doi']));
+            #         doi_dict = {}
+            #         doi_dict['_owner'] = 'uta_tacc'
+            #         doi_dict['_profile'] = 'datacite'
+            #         # doi_dict['_status'] = 'reserved'
+            #         doi_dict['_target'] = Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
+            #
+            #         # get pis for erc.who
+            #         central_cursor.execute('select distinct p.last_name, p.first_name from person p, authorization a, person_entity_role per, project pr where p.id = a.person_id and p.deleted = 0 and a.entity_type_id = 1 and p.id = per.person_id and a.entity_type_id = per.entity_type_id and a.entity_id = per.entity_id and pr.projid = per.entity_id  and (per.role_id = 1 or per.role_id = 2) and pr.projid = ' + str(project_id));
+            #         pis_dict_list = convert_rows_to_dict_list(central_cursor)
+            #         authors = ''
+            #         for pi_dict in pis_dict_list:
+            #             author = ', '.join(['{}'.format(v) for k,v in pi_dict.iteritems()])
+            #             authors = authors + author + ' ; '
+            #
+            #         doi_dict['datacite.creator'] = authors
+            #         doi_dict['datacite.title'] = row_dict['title']
+            #         doi_dict['datacite.publicationyear'] = '2016'
+            #         doi_dict['datacite.publisher'] = 'Network for Earthquake Engineering Simulation (NEES)'
+            #         doi_dict['datacite.resourcetype'] = 'Dataset'
+            #
+            #         data = '\n'.join(['{}:{}'.format(k,v) for k,v in doi_dict.iteritems()])
+            #
+            #         logging.debug('insert_experiment_metadata - replace DOI data:')
+            #         logging.debug(data);
+            #
+            #         shoulder = 'doi:10.17603/DS2'
+            #         response = issueRequest("shoulder/" + encode(shoulder), "POST", data)
+            #         logging.debug(response)
+            #
+            #         # replace bad doi
+            #         if 'success:' in response:
+            #             logging.debug('######################################################')
+            #             logging.debug('replacing DOI')
+            #             logging.debug('project name:')
+            #             logging.debug(project_name)
+            #             logging.debug('project id:');
+            #             logging.debug(row_dict['projid'])
+            #             logging.debug('experiment name:')
+            # 			logging.debug(experiment_name)
+            # 			logging.debug('pis:')
+            # 			logging.debug(str(doi_dict['datacite.creator']))
+            #             logging.debug('replaced ' + str(row_dict['doi']) + ' with ' + str(response.split()[1]))
+            #             logging.debug('######################################################')
+            #             row_dict['doi'] = response.split()[1]
+            #
+            #     except Exception, e:
+            #         logging.debug('insert_experiment_metadata - FAIL - createDOI:')
+            #         logging.debug(e)
 
             # update DOI: http://ezid.cdlib.org/doc/apidoc.html#internal-metadata
             # try:
@@ -619,8 +679,8 @@ def main(args):
         walk_project_directory(root_dir, project_objects, agave_system, central_cursor, neeshub_cursor, project_metadata_id, logging, project_dir_size, _index)
         logging.debug('main - after inserting project: ' + root_dir)
         project_objects_tuple = tuple(project_objects)
-        es = Elasticsearch([Config.get('es', 'es_server')])
-        project_objects_inserted = helpers.bulk(es, project_objects_tuple)
+        # es = Elasticsearch([Config.get('es', 'es_server')])
+        # project_objects_inserted = helpers.bulk(es, project_objects_tuple)
 
 
 if len(sys.argv) < 2:
