@@ -238,9 +238,6 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
     logging.debug( experiment_name )
 
     #insert experiment metadata
-    print 'project_name'
-    print str(experiment_name)
-
     central_cursor.execute("select projid, expid, name, title, start_date, end_date, description_4k from experiment where projid = " + "\'" + str(project_id) + "\'" + " and name = " + "\'" + str(experiment_name) + "\'" + "order by name" )
     project_rows_dict_list = convert_rows_to_dict_list(central_cursor)
 
@@ -249,12 +246,10 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
         logging.debug( row_dict['projid'] )
 
         # doi
-        print str(row_dict['expid'])
         central_cursor.execute("select b.doi from experiment a join contribution b on a.expid = b.entity_id where expid = " + "\'" + str(row_dict['expid']) + "\'")
         experiment_doi_rows_dict_list = convert_rows_to_dict_list(central_cursor)
         if (bool(experiment_doi_rows_dict_list) != False):
             row_dict['doi'] = experiment_doi_rows_dict_list[0]['doi']
-            print row_dict['doi']
 
             # Special case #2 - Create DOI for new Experiment-*, set to reserved so it can be deleted before making public
             if 'r: unautho' in row_dict['doi']:
