@@ -294,7 +294,9 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
                         logging.debug('project id:');
                         logging.debug(row_dict['projid'])
                         logging.debug('experiment name:')
-                        logging.debug(experiment_name)
+			logging.debug(experiment_name)
+			logging.debug('pis:')
+			logging.debug(str(doi_dict['datacite.creator']))
                         logging.debug('replaced ' + str(row_dict['doi']) + ' with ' + str(response.split()[1]))
                         logging.debug('######################################################')
                         row_dict['doi'] = response.split()[1]
@@ -395,7 +397,7 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
         experiment_metadata['_index'] = _index
         experiment_metadata['_type'] = 'experiment'
         experiment_metadata['_id'] = hashlib.md5(experiment_dir_path).hexdigest()
-        experiment_metadata['project'] = project_metadata_id
+        experiment_metadata['project'] = project_name
         experiment_metadata['deleted'] = 'false'
         experiment_metadata['systemId'] = agave_system
         experiment_metadata['experimentPath'] = experiment_dir_path
