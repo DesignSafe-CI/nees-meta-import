@@ -28,8 +28,8 @@ Note: You have to Accept Oracle's License Agreement. I downloaded from browser a
     $ cp -R ./sdk/include/* .
     $ ln -s libclntsh.so.12.1 libclntsh.so
     $ ln -s libocci.so.12.1 libocci.so
-    $ export ORACLE_HOME=$HOME/oracle/instantclient_12_1/
-    $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ORACLE_HOME
+    $ export LD_LIBRARY_PATH=$HOME/oracle/instantclient_12_1:$LD_LIBRARY_PATH
+    $ export PATH=$HOME/oracle/instantclient_12_1:$PATH
     $ cd $WORK
     $ git https://username@github.com:DesignSafe-CI/nees-meta-import.git
     $ cd nees-meta-import/elastic
@@ -45,7 +45,7 @@ Setup virtual environment
     $ mkvirtualenv dsimport
     $ pip install cx_Oracle
     $ pip install elasticsearch
-    $ pip install MySQLdb
+    $ pip install MySQL-python
 
 To run and index a single NEES-####-####.groups directory:
 
@@ -60,3 +60,22 @@ To run and index all directories with a single job:
     $ run.sh
 
 Note: You must have a current reservation in wrangler to run the job (see ```--reservation=NHERI``` in run.sh) and make sure that  ```/corral-repl/tacc/NHERI/public/projects``` is mounted. To run and index files in agave metadata, repeat steps above but use ```nees-meta-import/agave``` direcotory.
+
+Known errors importing libraries:
+
+MySQLdb Error:
+
+    >>> import MySQLdb
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+      File "/opt/apps/intel15/python/2.7.9/lib/python2.7/site-packages/MySQLdb/__init__.py", line 19, in <module>
+        import _mysql
+    ImportError: libmysqlclient_r.so.16: cannot open shared object file: No such file or directory
+
+Solution:
+
+    $ module load python
+    $ unset PYTHONPATH
+    $ source virtualenvwrapper.sh
+    $ mkvirtualenv dsimport
+    $ pip install MySQL-python
