@@ -241,6 +241,8 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
     central_cursor.execute("select projid, expid, name, title, start_date, end_date, description_4k from experiment where projid = " + "\'" + str(project_id) + "\'" + " and name = " + "\'" + str(experiment_name) + "\'" + "order by name" )
     project_rows_dict_list = convert_rows_to_dict_list(central_cursor)
 
+    es = Elasticsearch(['http://designsafe-es01.tacc.utexas.edu:9200'])
+
     for row_dict in project_rows_dict_list:
         logging.debug('insert_experiment_metadata - projid:')
         logging.debug( row_dict['projid'] )
@@ -249,19 +251,51 @@ def insert_experiment_metadata(root_dir, agave_system, experiment_name, central_
         central_cursor.execute("select b.doi from experiment a join contribution b on a.expid = b.entity_id where expid = " + "\'" + str(row_dict['expid']) + "\'")
         experiment_doi_rows_dict_list = convert_rows_to_dict_list(central_cursor)
         if (bool(experiment_doi_rows_dict_list) != False):
+
             row_dict['doi'] = experiment_doi_rows_dict_list[0]['doi']
+            opener = urllib2.build_opener()
+            opener.addheaders = [('Accept','application/vnd.citationstyles.csl+json')]
+            url = 'http://doi.org/' + row_dict['doi']
+            response = opener.open(url)
 
-            # update DOI: http://ezid.cdlib.org/doc/apidoc.html#internal-metadata
-            try:
-                path = "id/doi:"+encode(str(row_dict['doi']))
-                ezid_new_target = '_target: ' + Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
-                logging.debug(ezid_new_target)
-                ezid_response = issueRequest(path, "POST", ezid_new_target)
-                logging.debug(ezid_response)
+            logging.debug('fetching doi from doi.org:')
+            doi = json.loads(response.read())
+            logging.debug(doi)
 
-            except Exception, e:
-                logging.debug('insert_experiment_metadata - FAIL - insertDOI:')
-                logging.debug(e)
+            authors = []
+            for author in doi['author']:
+                authors.append({'firstName': author['given'], 'lastName': author['family']})
+
+            query = '_type: "experiment" AND project._exact:' + project_name + ' AND name._exact: ' + experiment_name
+            logging.debug('query:')
+            logging.debug(query)
+            experiment = es.search(index='nees', q=query, size=3000)
+
+            logging.debug('inserting authors field in experiment metadata:')
+
+            body = {}
+            body['doc'] = {}
+            body['doc']['creators'] = authors
+            logging.debug(body)
+            result = es.update(index='nees', doc_type='experiment', id=experiment['hits']['hits'][0]['_id'], body=body)
+            logging.debug(result)
+
+        # central_cursor.execute("select b.doi from experiment a join contribution b on a.expid = b.entity_id where expid = " + "\'" + str(row_dict['expid']) + "\'")
+        # experiment_doi_rows_dict_list = convert_rows_to_dict_list(central_cursor)
+        # if (bool(experiment_doi_rows_dict_list) != False):
+        #     row_dict['doi'] = experiment_doi_rows_dict_list[0]['doi']
+        #
+        #     # update DOI: http://ezid.cdlib.org/doc/apidoc.html#internal-metadata
+        #     try:
+        #         path = "id/doi:"+encode(str(row_dict['doi']))
+        #         ezid_new_target = '_target: ' + Config.get('ezid', 'baseUrl') + agave_system + '/' + os.path.basename(os.path.normpath(root_dir)) + '/' + row_dict['name']
+        #         logging.debug(ezid_new_target)
+        #         ezid_response = issueRequest(path, "POST", ezid_new_target)
+        #         logging.debug(ezid_response)
+        #
+        #     except Exception, e:
+        #         logging.debug('insert_experiment_metadata - FAIL - insertDOI:')
+        #         logging.debug(e)
 
 
         # experiment type
@@ -564,7 +598,7 @@ def main(args):
         project_dir_size = 0
         walk_project_directory(root_dir, project_objects, agave_system, central_cursor, neeshub_cursor, project_metadata_id, logging, project_dir_size, _index)
         logging.debug('main - after inserting project: ' + root_dir)
-        project_objects_tuple = tuple(project_objects)
+        # project_objects_tuple = tuple(project_objects)
         # es = Elasticsearch([Config.get('es', 'es_server')])
         # project_objects_inserted = helpers.bulk(es, project_objects_tuple)
 
